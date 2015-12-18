@@ -1,8 +1,0 @@
-#include "hitfindermodules.fcl"
-
-BEGIN_PROLOG
-
-jp250L_hitfinder:       @local::standard_hitfinder
-jp250L_gaushitfinder:   @local::gaus_hitfinder
-
-END_PROLOG
