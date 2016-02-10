@@ -1,8 +1,0 @@
-#include "hitfindermodules.fcl"
-
-BEGIN_PROLOG
-
-bo_hitfinder:       @local::standard_hitfinder
-bo_gaushitfinder:   @local::gaus_hitfinder
-
-END_PROLOG
