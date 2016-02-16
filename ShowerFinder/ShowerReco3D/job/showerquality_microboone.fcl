@@ -1,6 +1,0 @@
-#include "showerquality.fcl"
-BEGIN_PROLOG
-
-showerquality_uboone: @local::standard_showerquality
-
-END_PROLOG
