@@ -1,7 +1,0 @@
-#include "eventfindermodules.fcl"
-
-BEGIN_PROLOG
-
-dune_eventmaker:       @local::standard_eventmaker
-
-END_PROLOG
