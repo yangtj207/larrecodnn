@@ -1,8 +1,0 @@
-BEGIN_PROLOG
-
-microboone_beziertrackservice:
-{
-  SegmentResolution: 100
-}
-
-END_PROLOG
