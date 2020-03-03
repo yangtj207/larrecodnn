@@ -29,8 +29,8 @@
 #include "nusimdata/SimulationBase/MCParticle.h"
 
 #include "larreco/RecoAlg/ImagePatternAlgs/DataProvider/DataProviderAlg.h"
-#include "larreco/RecoAlg/ImagePatternAlgs/Keras/keras_model.h"
-#include "larreco/RecoAlg/ImagePatternAlgs/Tensorflow/TF/tf_graph.h"
+#include "larrecodnn/ImagePatternAlgs/Keras/keras_model.h"
+#include "larrecodnn/ImagePatternAlgs/Tensorflow/TF/tf_graph.h"
 
 // Nvidia TensorRT inference server client includes
 #include "trtis_clients/request_grpc.h"

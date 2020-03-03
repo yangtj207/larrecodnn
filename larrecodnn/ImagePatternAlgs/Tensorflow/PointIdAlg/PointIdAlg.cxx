@@ -7,7 +7,7 @@
 //              M.Wang,                                    from DUNE,   FNAL, 2020: trtis_client
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "larreco/RecoAlg/ImagePatternAlgs/Tensorflow/PointIdAlg/PointIdAlg.h"
+#include "larrecodnn/ImagePatternAlgs/Tensorflow/PointIdAlg/PointIdAlg.h"
 #include "tensorflow/core/public/session.h"
 
 #include "art/Framework/Principal/Event.h"

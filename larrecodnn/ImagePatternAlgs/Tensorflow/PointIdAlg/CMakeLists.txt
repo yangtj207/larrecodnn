@@ -3,8 +3,8 @@ cet_find_library(TRTIS_CLIENTS_LIBRARY NAMES request PATHS $ENV{TRTIS_CLIENTS_LI
 
 art_make(
           LIB_LIBRARIES larreco_RecoAlg_ImagePatternAlgs_DataProvider
-                        larreco_RecoAlg_ImagePatternAlgs_Keras
-                        larreco_RecoAlg_ImagePatternAlgs_Tensorflow_TF
+                        larrecodnn_ImagePatternAlgs_Keras
+                        larrecodnn_ImagePatternAlgs_Tensorflow_TF
                         larcore_Geometry_Geometry_service
                         larcorealg_Geometry
                         lardataobj_RecoBase

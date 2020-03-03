@@ -4,7 +4,7 @@ art_make( MODULE_LIBRARIES
 		lardataobj_RecoBase
 		lardata_ArtDataHelper
 		larreco_Calorimetry
-		larreco_RecoAlg_ImagePatternAlgs_Tensorflow_PointIdAlg
+		larrecodnn_ImagePatternAlgs_Tensorflow_PointIdAlg
 		nusimdata_SimulationBase
 		${ART_FRAMEWORK_CORE}
 		${ART_FRAMEWORK_PRINCIPAL}

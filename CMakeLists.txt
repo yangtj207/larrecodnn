@@ -1,8 +1,8 @@
 # ======================================================================
-#  larreco main build file
+#  larrecodnn main build file
 #
 #  cd .../path/to/build/directory
-#  source .../path/to/larreco/ups/setup_for_development <-d|-p>
+#  source .../path/to/larrecodnn/ups/setup_for_development <-d|-p>
 #  buildtool [-I /install/path] -bt[i] -jN
 # ======================================================================
 
@@ -10,7 +10,7 @@
 # use cmake 3.14 or later
 cmake_minimum_required (VERSION 3.12...3.14 FATAL_ERROR)
 
-project(larreco LANGUAGES CXX)
+project(larrecodnn LANGUAGES CXX)
 
 # cetbuildtools contains our cmake modules
 SET ( CETBUILDTOOLS_VERSION $ENV{CETBUILDTOOLS_VERSION} )
@@ -51,18 +51,18 @@ find_ups_product( cetbuildtools )
 find_ups_product( postgresql )
 find_ups_product( range )
 find_ups_product( eigen )
-find_ups_product(trtis_clients)
 
 # macros for dictionary and simple_plugin
 include(ArtDictionary)
 include(ArtMake)
 include(BuildPlugins)
 
-# not ready for c2 yet
+# cannot build tensorflow with our clang
 if( DEFINED ENV{TENSORFLOW_DIR} )
   # find tensorflow library
   find_ups_product( protobuf )
   find_ups_product( tensorflow )
+  find_ups_product(trtis_clients)
   cet_find_library(TENSORFLOW NAMES tensorflow-core PATHS ENV TENSORFLOW_LIB NO_DEFAULT_PATH )
   cet_find_library(PROTOBUF NAMES protobuf PATHS ENV PROTOBUF_LIB NO_DEFAULT_PATH )
   # This is a hack for a broken tensorflow link, which
@@ -74,10 +74,7 @@ if( DEFINED ENV{TENSORFLOW_DIR} )
 endif ()
 
 # source
-add_subdirectory(larreco)
-
-# tests
-add_subdirectory(test)
+add_subdirectory(larrecodnn)
 
 # ups - table and config files
 add_subdirectory(ups)
