@@ -7,7 +7,7 @@ fcldir product_dir job
 fwdir  product_dir config_data
 #
 product         version
-larreco         v08_28_00
+larreco         v08_29_00
 trtis_clients   v19_11a		-	optional
 tensorflow      v1_3_0i		-	optional
 cetbuildtools   v7_15_01	-	only_for_build
