@@ -1,3 +1,4 @@
+include_directories( $ENV{TENSORFLOW_INC}/absl )
 art_make( 
           LIB_LIBRARIES 
 			${FHICLCPP}

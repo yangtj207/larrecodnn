@@ -1,3 +1,4 @@
+include_directories( $ENV{TENSORFLOW_INC}/absl )
 include_directories($ENV{TRTIS_CLIENTS_INC})
 cet_find_library(TRTIS_CLIENTS_LIBRARY NAMES request PATHS $ENV{TRTIS_CLIENTS_LIB})
 
