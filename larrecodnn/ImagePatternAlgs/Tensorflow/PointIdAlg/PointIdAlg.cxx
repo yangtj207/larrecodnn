@@ -12,18 +12,15 @@
 #include "art/Framework/Principal/Event.h"
 #include "art/Framework/Principal/Handle.h"
 #include "art/Framework/Services/Registry/ServiceHandle.h"
+#include "messagefacility/MessageLogger/MessageLogger.h"
 
 #include "larcore/CoreUtils/ServiceUtil.h" // lar::providerFrom<>()
 #include "larcorealg/Geometry/ChannelMapAlg.h"
 #include "larcorealg/Geometry/Exceptions.h" // geo::InvalidWireIDError
-
 #include "lardataobj/Simulation/SimChannel.h"
-#include "larsim/Simulation/LArG4Parameters.h"
-
 #include "larevt/CalibrationDBI/Interface/ChannelStatusProvider.h"
 #include "larevt/CalibrationDBI/Interface/ChannelStatusService.h"
-
-#include "messagefacility/MessageLogger/MessageLogger.h"
+#include "larsim/Simulation/LArG4Parameters.h"
 
 #include "CLHEP/Random/RandGauss.h"
 
@@ -183,14 +180,14 @@ nnet::PointIdAlg::PointIdAlg(const Config& config)
 }
 // ------------------------------------------------------
 
-nnet::PointIdAlg::~PointIdAlg(void)
+nnet::PointIdAlg::~PointIdAlg()
 {
   deleteNNet();
 }
 // ------------------------------------------------------
 
 void
-nnet::PointIdAlg::resizePatch(void)
+nnet::PointIdAlg::resizePatch()
 {
   fWireDriftPatch.resize(fPatchSizeW);
   for (auto& r : fWireDriftPatch)
@@ -349,13 +346,16 @@ nnet::TrainingDataAlg::TrainingDataAlg(const Config& config)
 }
 // ------------------------------------------------------
 
-nnet::TrainingDataAlg::~TrainingDataAlg(void) {}
+nnet::TrainingDataAlg::~TrainingDataAlg() = default;
 // ------------------------------------------------------
 
 void
-nnet::TrainingDataAlg::resizeView(size_t wires, size_t drifts)
+nnet::TrainingDataAlg::resizeView(detinfo::DetectorClocksData const& clockData,
+                                  detinfo::DetectorPropertiesData const& detProp,
+                                  size_t wires,
+                                  size_t drifts)
 {
-  img::DataProviderAlg::resizeView(wires, drifts);
+  img::DataProviderAlg::resizeView(clockData, detProp, wires, drifts);
 
   fWireDriftEdep.resize(wires);
   for (auto& w : fWireDriftEdep) {
@@ -416,9 +416,11 @@ nnet::TrainingDataAlg::setWireEdepsAndLabels(std::vector<float> const& edeps,
 // ------------------------------------------------------
 
 nnet::TrainingDataAlg::WireDrift
-nnet::TrainingDataAlg::getProjection(const TLorentzVector& tvec, unsigned int plane) const
+nnet::TrainingDataAlg::getProjection(detinfo::DetectorClocksData const& clockData,
+                                     detinfo::DetectorPropertiesData const& detProp,
+                                     const TLorentzVector& tvec,
+                                     unsigned int plane) const
 {
-  auto const* detprop = lar::providerFrom<detinfo::DetectorPropertiesService>();
   nnet::TrainingDataAlg::WireDrift wd;
   wd.Wire = 0;
   wd.Drift = 0;
@@ -432,7 +434,7 @@ nnet::TrainingDataAlg::getProjection(const TLorentzVector& tvec, unsigned int pl
       unsigned int tpc = tpcid.TPC, cryo = tpcid.Cryostat;
 
       // correct for the time offset
-      float dx = tvec.T() * 1.e-3 * detprop->DriftVelocity();
+      float dx = tvec.T() * 1.e-3 * detProp.DriftVelocity();
       int driftDir = fGeometry->TPC(tpcid).DetectDriftDirection();
       if (driftDir == 1) { dx *= -1; }
       else if (driftDir != -1) {
@@ -441,7 +443,7 @@ nnet::TrainingDataAlg::getProjection(const TLorentzVector& tvec, unsigned int pl
       vtx[0] = tvec.X() + dx;
 
       wd.Wire = fGeometry->NearestWire(vtx, plane, tpc, cryo);
-      wd.Drift = fDetProp->ConvertXToTicks(vtx[0], plane, tpc, cryo);
+      wd.Drift = detProp.ConvertXToTicks(vtx[0], plane, tpc, cryo);
       wd.TPC = tpc;
       wd.Cryo = cryo;
     }
@@ -544,6 +546,8 @@ nnet::TrainingDataAlg::isMuonDecaying(
 void
 nnet::TrainingDataAlg::collectVtxFlags(
   std::unordered_map<size_t, std::unordered_map<int, int>>& wireToDriftToVtxFlags,
+  detinfo::DetectorClocksData const& clockData,
+  detinfo::DetectorPropertiesData const& detProp,
   const std::unordered_map<int, const simb::MCParticle*>& particleMap,
   unsigned int plane) const
 {
@@ -561,7 +565,6 @@ nnet::TrainingDataAlg::collectVtxFlags(
     case 22:                                                     // gamma
       if ((particle.EndProcess() == "conv") && (ekStart > 40.0)) // conversion, gamma > 40MeV
       {
-        //std::cout << "---> gamma conversion at " << ekStart << std::endl;
         flagsEnd = nnet::TrainingDataAlg::kConv;
       }
       break;
@@ -571,14 +574,10 @@ nnet::TrainingDataAlg::collectVtxFlags(
       break;
 
     case 13: // mu+/-
-      if (isMuonDecaying(particle, particleMap)) {
-        //std::cout << "---> mu decay to electron" << std::endl;
-        flagsEnd = nnet::TrainingDataAlg::kDecay;
-      }
+      if (isMuonDecaying(particle, particleMap)) { flagsEnd = nnet::TrainingDataAlg::kDecay; }
       break;
 
     case 111: // pi0
-      //std::cout << "---> pi0" << std::endl;
       flagsStart = nnet::TrainingDataAlg::kPi0;
       break;
 
@@ -611,13 +610,9 @@ nnet::TrainingDataAlg::collectVtxFlags(
             // at least secondary hadrons with Ek > 50MeV (so this is a good kink or V-like)
             if (((m_pdg != pdg) && (m_pdg != 2112)) || ((m_pdg != 2112) && (nVisible > 0)) ||
                 ((m_pdg == 2112) && (nVisible > 1))) {
-              // std::cout << "---> hadron at " << ekStart
-              //	<< ", pdg: " << pdg << ", mother pdg: " << m_pdg
-              //	<< ", vis.daughters: " << nVisible << std::endl;
               flagsStart = nnet::TrainingDataAlg::kHadr;
             }
           }
-          // else std::cout << "---> mother not found for tid: " << particle.Mother() << std::endl;
         }
 
         if (particle.EndProcess() == "FastScintillation") // potential decay at rest
@@ -629,12 +624,10 @@ nnet::TrainingDataAlg::collectVtxFlags(
               auto const& daughter = *((*d_search).second);
               int d_pdg = abs(daughter.PdgCode());
               if ((pdg == 321) && (d_pdg == 13)) {
-                //std::cout << "---> K decay to mu" << std::endl;
                 flagsEnd = nnet::TrainingDataAlg::kDecay;
                 break;
               }
               if ((pdg == 211) && (d_pdg == 13)) {
-                //std::cout << "---> pi decay to mu" << std::endl;
                 flagsEnd = nnet::TrainingDataAlg::kDecay;
                 break;
               }
@@ -651,12 +644,10 @@ nnet::TrainingDataAlg::collectVtxFlags(
               auto const& daughter = *((*d_search).second);
               int d_pdg = abs(daughter.PdgCode());
               if ((pdg == 321) && (d_pdg == 13)) {
-                //std::cout << "---> in-flight K decay to mu" << std::endl;
                 flagsEnd = nnet::TrainingDataAlg::kHadr;
                 break;
               }
               if ((pdg == 211) && (d_pdg == 13)) {
-                //std::cout << "---> in-flight pi decay to mu" << std::endl;
                 flagsEnd = nnet::TrainingDataAlg::kHadr;
                 break;
               }
@@ -672,31 +663,19 @@ nnet::TrainingDataAlg::collectVtxFlags(
     if (particle.Process() == "primary") { flagsStart |= nnet::TrainingDataAlg::kNuPri; }
 
     if (flagsStart != nnet::TrainingDataAlg::kNone) {
-      auto wd = getProjection(particle.Position(), plane);
+      auto wd = getProjection(clockData, detProp, particle.Position(), plane);
 
       if ((wd.TPC == (int)fTPC) && (wd.Cryo == (int)fCryo)) {
         wireToDriftToVtxFlags[wd.Wire][wd.Drift] |= flagsStart;
-        // std::cout << "---> flagsStart:" << flagsStart << " plane:" << plane << " wire:" << wd.Wire << " drift:" << wd.Drift << std::endl;
       }
-      // else std::cout << "---> not in current TPC" << std::endl;
     }
     if (flagsEnd != nnet::TrainingDataAlg::kNone) {
-      auto wd = getProjection(particle.EndPosition(), plane);
+      auto wd = getProjection(clockData, detProp, particle.EndPosition(), plane);
       if ((wd.TPC == (int)fTPC) && (wd.Cryo == (int)fCryo)) {
-        //if (flagsEnd == nnet::TrainingDataAlg::kElectronEnd) { std::cout << "---> clear electron endpoint" << std::endl; }
         wireToDriftToVtxFlags[wd.Wire][wd.Drift] |= flagsEnd;
-        //if (flagsEnd == nnet::TrainingDataAlg::kElectronEnd)
-        //    std::cout << "---> flagsEnd:" << flagsEnd << " plane:" << plane << " wire:" << wd.Wire << " drift:" << wd.Drift << std::endl;
       }
-      // else std::cout << "---> not in current TPC" << std::endl;
     }
 
-    //if (ekStart > 30.0)
-    //{
-    //	std::cout << particle.PdgCode() << ", " << ekStart << ": "
-    //		<< particle.Process() << " --> " << particle.EndProcess()
-    //		<< " " << ekEnd	<< std::endl;
-    //}
     //TY: check elastic/inelastic scattering
     if (pdg == 321 || pdg == 211 || pdg == 2212) {
       simb::MCTrajectory truetraj = particle.Trajectory();
@@ -704,13 +683,13 @@ nnet::TrainingDataAlg::collectVtxFlags(
       if (thisTrajectoryProcessMap1.size()) {
         for (auto const& couple1 : thisTrajectoryProcessMap1) {
           if ((truetraj.KeyToProcess(couple1.second)).find("Elastic") != std::string::npos) {
-            auto wd = getProjection(truetraj.at(couple1.first).first, plane);
+            auto wd = getProjection(clockData, detProp, truetraj.at(couple1.first).first, plane);
             if ((wd.TPC == (int)fTPC) && (wd.Cryo == (int)fCryo)) {
               wireToDriftToVtxFlags[wd.Wire][wd.Drift] |= nnet::TrainingDataAlg::kElastic;
             }
           }
           if ((truetraj.KeyToProcess(couple1.second)).find("Inelastic") != std::string::npos) {
-            auto wd = getProjection(truetraj.at(couple1.first).first, plane);
+            auto wd = getProjection(clockData, detProp, truetraj.at(couple1.first).first, plane);
             if ((wd.TPC == (int)fTPC) && (wd.Cryo == (int)fCryo)) {
               wireToDriftToVtxFlags[wd.Wire][wd.Drift] |= nnet::TrainingDataAlg::kInelastic;
             }
@@ -724,6 +703,8 @@ nnet::TrainingDataAlg::collectVtxFlags(
 
 bool
 nnet::TrainingDataAlg::setDataEventData(const art::Event& event,
+                                        detinfo::DetectorClocksData const& clockData,
+                                        detinfo::DetectorPropertiesData const& detProp,
                                         unsigned int plane,
                                         unsigned int tpc,
                                         unsigned int cryo)
@@ -734,7 +715,7 @@ nnet::TrainingDataAlg::setDataEventData(const art::Event& event,
 
   if (event.getByLabel(fWireProducerLabel, wireHandle)) art::fill_ptr_vector(Wirelist, wireHandle);
 
-  if (!setWireDriftData(*wireHandle, plane, tpc, cryo)) {
+  if (!setWireDriftData(clockData, detProp, *wireHandle, plane, tpc, cryo)) {
     mf::LogError("TrainingDataAlg") << "Wire data not set.";
     return false;
   }
@@ -865,17 +846,13 @@ nnet::TrainingDataAlg::setDataEventData(const art::Event& event,
 
   } // for each Wire
 
-  /*
-    for(size_t i = 0; i < fEventsPerBin.size(); i ++) {
-    std::cout << i << ") " << fEventsPerBin[i] << " - ";
-    }
-  */
-
   return true;
 }
 
 bool
 nnet::TrainingDataAlg::setEventData(const art::Event& event,
+                                    detinfo::DetectorClocksData const& clockData,
+                                    detinfo::DetectorPropertiesData const& detProp,
                                     unsigned int plane,
                                     unsigned int tpc,
                                     unsigned int cryo)
@@ -883,7 +860,7 @@ nnet::TrainingDataAlg::setEventData(const art::Event& event,
   art::ValidHandle<std::vector<recob::Wire>> wireHandle =
     event.getValidHandle<std::vector<recob::Wire>>(fWireProducerLabel);
 
-  if (!setWireDriftData(*wireHandle, plane, tpc, cryo)) {
+  if (!setWireDriftData(clockData, detProp, *wireHandle, plane, tpc, cryo)) {
     mf::LogError("TrainingDataAlg") << "Wire data not set.";
     return false;
   }
@@ -908,7 +885,7 @@ nnet::TrainingDataAlg::setEventData(const art::Event& event,
   }
 
   std::unordered_map<size_t, std::unordered_map<int, int>> wireToDriftToVtxFlags;
-  if (fSaveVtxFlags) collectVtxFlags(wireToDriftToVtxFlags, particleMap, plane);
+  if (fSaveVtxFlags) collectVtxFlags(wireToDriftToVtxFlags, clockData, detProp, particleMap, plane);
 
   fEdepTot = 0;
 

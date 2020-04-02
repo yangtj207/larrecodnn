@@ -11,7 +11,7 @@
 #include "larcore/Geometry/Geometry.h"
 #include "larcorealg/Geometry/GeometryCore.h"
 #include "larcoreobj/SimpleTypesAndConstants/geo_types.h"
-
+#include "lardata/DetectorInfoServices/DetectorClocksService.h"
 #include "larrecodnn/ImagePatternAlgs/Tensorflow/PointIdAlg/PointIdAlg.h"
 
 // Framework includes
@@ -125,9 +125,15 @@ namespace nnet {
 
     std::cout << "analyze " << os.str() << std::endl;
 
+    auto const clockData =
+      art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(event);
+    auto const detProp =
+      art::ServiceHandle<detinfo::DetectorPropertiesService const>()->DataFor(event, clockData);
+
     for (size_t i = 0; i < fSelectedTPC.size(); ++i)
       for (size_t v = 0; v < fSelectedPlane.size(); ++v) {
-        fTrainingDataAlg.setEventData(event, fSelectedPlane[v], fSelectedTPC[i], 0);
+        fTrainingDataAlg.setEventData(
+          event, clockData, detProp, fSelectedPlane[v], fSelectedTPC[i], 0);
 
         unsigned int w0, w1, d0, d1;
         if (fCrop && saveSim) {

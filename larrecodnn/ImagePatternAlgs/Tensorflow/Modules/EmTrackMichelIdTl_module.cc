@@ -35,12 +35,13 @@
 #include "messagefacility/MessageLogger/MessageLogger.h"
 
 #include "larcore/Geometry/Geometry.h"
+#include "lardata/ArtDataHelper/MVAWriter.h"
+#include "lardata/DetectorInfoServices/DetectorClocksService.h"
+#include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
 #include "lardata/Utilities/AssociationUtil.h"
 #include "lardataobj/RecoBase/Cluster.h"
 #include "lardataobj/RecoBase/Hit.h"
 #include "lardataobj/RecoBase/Track.h"
-
-#include "lardata/ArtDataHelper/MVAWriter.h"
 #include "larrecodnn/ImagePatternAlgs/Tensorflow/PointIdAlgTools/IPointIdAlg.h"
 
 #include <memory>
@@ -122,11 +123,9 @@ namespace nnet {
     , fClusterModuleLabel(config().ClusterModuleLabel())
     , fTrackModuleLabel(config().TrackModuleLabel())
     , fViews(config().Views())
-    ,
-
-    fNewClustersTag(config.get_PSet().get<std::string>("module_label"),
-                    "",
-                    art::ServiceHandle<art::TriggerNamesService const>()->getProcessName())
+    , fNewClustersTag(config.get_PSet().get<std::string>("module_label"),
+                      "",
+                      art::ServiceHandle<art::TriggerNamesService const>()->getProcessName())
   {
     fMVAWriter.produces_using<recob::Hit>();
 
@@ -163,8 +162,6 @@ namespace nnet {
 
     auto wireHandle = evt.getValidHandle<std::vector<recob::Wire>>(fWireProducerLabel);
 
-    unsigned int cryo, tpc, view;
-
     // ******************* get and sort hits ********************
     auto hitListHandle = evt.getValidHandle<std::vector<recob::Hit>>(fHitModuleLabel);
     std::vector<art::Ptr<recob::Hit>> hitPtrList;
@@ -172,11 +169,11 @@ namespace nnet {
 
     EmTrackMichelIdTl::cryo_tpc_view_keymap hitMap;
     for (auto const& h : hitPtrList) {
-      view = h->WireID().Plane;
+      unsigned int view = h->WireID().Plane;
       if (!isViewSelected(view)) continue;
 
-      cryo = h->WireID().Cryostat;
-      tpc = h->WireID().TPC;
+      unsigned int cryo = h->WireID().Cryostat;
+      unsigned int tpc = h->WireID().TPC;
 
       hitMap[cryo][tpc][view].push_back(h.key());
     }
@@ -185,18 +182,20 @@ namespace nnet {
     auto hitID = fMVAWriter.initOutputs<recob::Hit>(
       fHitModuleLabel, hitPtrList.size(), fPointIdAlgTool->outputLabels());
 
+    auto const clockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(evt);
+    auto const detProp =
+      art::ServiceHandle<detinfo::DetectorPropertiesService const>()->DataFor(evt, clockData);
+
     std::vector<char> hitInFA(
       hitPtrList.size(),
       0); // tag hits in fid. area as 1, use 0 for hits close to the projectrion edges
-    for (auto const& pcryo : hitMap) {
-      cryo = pcryo.first;
-      for (auto const& ptpc : pcryo.second) {
-        tpc = ptpc.first;
-        for (auto const& pview : ptpc.second) {
-          view = pview.first;
+    for (auto const& [cryo, tpcs] : hitMap) {
+      for (auto const& [tpc, views] : tpcs) {
+        for (auto const& pview : views) {
+          auto const view = pview.first;
           if (!isViewSelected(view)) continue; // should not happen, hits were selected
 
-          fPointIdAlgTool->setWireDriftData(*wireHandle, view, tpc, cryo);
+          fPointIdAlgTool->setWireDriftData(clockData, detProp, *wireHandle, view, tpc, cryo);
 
           // (1) do all hits in this plane ------------------------------------------------
           for (size_t idx = 0; idx < pview.second.size(); idx += fBatchSize) {
@@ -241,11 +240,11 @@ namespace nnet {
 
       EmTrackMichelIdTl::cryo_tpc_view_keymap cluMap;
       for (auto const& c : cluPtrList) {
-        view = c->Plane().Plane;
+        unsigned int view = c->Plane().Plane;
         if (!isViewSelected(view)) continue;
 
-        cryo = c->Plane().Cryostat;
-        tpc = c->Plane().TPC;
+        unsigned int cryo = c->Plane().Cryostat;
+        unsigned int tpc = c->Plane().TPC;
 
         cluMap[cryo][tpc][view].push_back(c.key());
       }
@@ -256,12 +255,10 @@ namespace nnet {
       unsigned int cidx = 0; // new clusters index
       art::FindManyP<recob::Hit> hitsFromClusters(cluListHandle, evt, fClusterModuleLabel);
       std::vector<bool> hitUsed(hitPtrList.size(), false); // tag hits used in clusters
-      for (auto const& pcryo : cluMap) {
-        cryo = pcryo.first;
-        for (auto const& ptpc : pcryo.second) {
-          tpc = ptpc.first;
-          for (auto const& pview : ptpc.second) {
-            view = pview.first;
+      for (auto const& [cryo, tpcs] : cluMap) {
+        for (auto const& [tpc, views] : tpcs) {
+          for (auto const& pview : views) {
+            auto const view = pview.first;
             if (!isViewSelected(view)) continue; // should not happen, clusters were pre-selected
 
             for (size_t c : pview.second) // c is the Ptr< recob::Cluster >::key()

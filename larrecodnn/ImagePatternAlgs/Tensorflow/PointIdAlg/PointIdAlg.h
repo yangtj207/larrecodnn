@@ -17,18 +17,21 @@
 
 // Framework includes
 #include "art/Framework/Principal/Handle.h"
+#include "canvas/Persistency/Common/FindManyP.h"
 #include "canvas/Utilities/InputTag.h"
 
 // LArSoft includes
-#include "canvas/Persistency/Common/FindManyP.h"
 #include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
 #include "lardataobj/RecoBase/Hit.h"
 #include "lardataobj/RecoBase/Track.h"
-#include "nusimdata/SimulationBase/MCParticle.h"
-
 #include "larreco/RecoAlg/ImagePatternAlgs/DataProvider/DataProviderAlg.h"
 #include "larrecodnn/ImagePatternAlgs/Keras/keras_model.h"
 #include "larrecodnn/ImagePatternAlgs/Tensorflow/TF/tf_graph.h"
+#include "nusimdata/SimulationBase/MCParticle.h"
+namespace detinfo {
+  class DetectorClocksData;
+  class DetectorPropertiesData;
+}
 
 // ROOT & C++
 #include <memory>
@@ -46,7 +49,7 @@ namespace nnet {
 /// may be used from UPS.
 class nnet::ModelInterface {
 public:
-  virtual ~ModelInterface(void) {}
+  virtual ~ModelInterface() {}
 
   virtual std::vector<float> Run(std::vector<std::vector<float>> const& inp2d) = 0;
   virtual std::vector<std::vector<float>> Run(
@@ -54,7 +57,7 @@ public:
     int samples = -1);
 
 protected:
-  ModelInterface(void) {}
+  ModelInterface() {}
 
   std::string findFile(const char* fileName) const;
 };
@@ -105,11 +108,11 @@ public:
 
   PointIdAlg(const Config& config);
 
-  ~PointIdAlg(void) override;
+  ~PointIdAlg() override;
 
   /// network output labels
   std::vector<std::string> const&
-  outputLabels(void) const
+  outputLabels() const
   {
     return fNNetOutputs;
   }
@@ -126,12 +129,12 @@ public:
   static std::vector<float> flattenData2D(std::vector<std::vector<float>> const& patch);
 
   std::vector<std::vector<float>> const&
-  patchData2D(void) const
+  patchData2D() const
   {
     return fWireDriftPatch;
   }
   std::vector<float>
-  patchData1D(void) const
+  patchData1D() const
   {
     return flattenData2D(fWireDriftPatch);
   } // flat vector made of the patch data, wire after wire
@@ -182,10 +185,10 @@ private:
   {
     return bufferPatch(wire, drift, fWireDriftPatch);
   }
-  void resizePatch(void);
+  void resizePatch();
 
   void
-  deleteNNet(void)
+  deleteNNet()
   {
     if (fNNet) delete fNNet;
     fNNet = 0;
@@ -254,7 +257,7 @@ public:
 
   TrainingDataAlg(const Config& config);
 
-  ~TrainingDataAlg(void) override;
+  ~TrainingDataAlg() override;
 
   void reconfigure(const Config& config);
 
@@ -266,12 +269,16 @@ public:
 
   bool setEventData(
     const art::Event& event, // collect & downscale ADC's, charge deposits, pdg labels
+    detinfo::DetectorClocksData const& clockData,
+    detinfo::DetectorPropertiesData const& detProp,
     unsigned int plane,
     unsigned int tpc,
     unsigned int cryo);
 
   bool setDataEventData(
     const art::Event& event, // collect & downscale ADC's, charge deposits, pdg labels
+    detinfo::DetectorClocksData const& clockData,
+    detinfo::DetectorPropertiesData const& detProp,
     unsigned int plane,
     unsigned int tpc,
     unsigned int cryo);
@@ -283,7 +290,7 @@ public:
                 unsigned int& d1) const;
 
   double
-  getEdepTot(void) const
+  getEdepTot() const
   {
     return fEdepTot;
   } // [GeV]
@@ -299,7 +306,10 @@ public:
   }
 
 protected:
-  void resizeView(size_t wires, size_t drifts) override;
+  void resizeView(detinfo::DetectorClocksData const& clockData,
+                  detinfo::DetectorPropertiesData const& detProp,
+                  size_t wires,
+                  size_t drifts) override;
 
 private:
   struct WireDrift // used to find MCParticle start/end 2D projections
@@ -310,7 +320,10 @@ private:
     int Cryo;
   };
 
-  WireDrift getProjection(const TLorentzVector& tvec, unsigned int plane) const;
+  WireDrift getProjection(detinfo::DetectorClocksData const& clockData,
+                          detinfo::DetectorPropertiesData const& detProp,
+                          const TLorentzVector& tvec,
+                          unsigned int plane) const;
 
   bool setWireEdepsAndLabels(std::vector<float> const& edeps,
                              std::vector<int> const& pdgs,
@@ -318,6 +331,8 @@ private:
 
   void collectVtxFlags(
     std::unordered_map<size_t, std::unordered_map<int, int>>& wireToDriftToVtxFlags,
+    detinfo::DetectorClocksData const& clockData,
+    detinfo::DetectorPropertiesData const& detProp,
     const std::unordered_map<int, const simb::MCParticle*>& particleMap,
     unsigned int plane) const;
 

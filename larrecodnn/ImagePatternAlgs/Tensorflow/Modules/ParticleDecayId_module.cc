@@ -1,4 +1,4 @@
-/////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 // Class:       ParticleDecayId
 // Module Type: producer
 // File:        ParticleDecayId_module.cc
@@ -19,12 +19,12 @@
 #include "messagefacility/MessageLogger/MessageLogger.h"
 
 #include "larcore/Geometry/Geometry.h"
+#include "lardata/DetectorInfoServices/DetectorClocksService.h"
 #include "lardata/Utilities/AssociationUtil.h"
 #include "lardataobj/RecoBase/Hit.h"
 #include "lardataobj/RecoBase/SpacePoint.h"
 #include "lardataobj/RecoBase/Track.h"
 #include "lardataobj/RecoBase/Vertex.h"
-
 #include "larrecodnn/ImagePatternAlgs/Tensorflow/PointIdAlg/PointIdAlg.h"
 
 #include <TVector3.h>
@@ -72,7 +72,9 @@ namespace nnet {
   private:
     void produce(art::Event& e) override;
 
-    bool DetectDecay(const std::vector<recob::Wire>& wires,
+    bool DetectDecay(detinfo::DetectorClocksData const& clockData,
+                     detinfo::DetectorPropertiesData const& detProp,
+                     const std::vector<recob::Wire>& wires,
                      const std::vector<art::Ptr<recob::Hit>>& hits,
                      std::map<size_t, TVector3>& spoints,
                      std::vector<std::pair<TVector3, double>>& result);
@@ -110,8 +112,6 @@ namespace nnet {
     auto vtxs = std::make_unique<std::vector<recob::Vertex>>();
     auto vtx2trk = std::make_unique<art::Assns<recob::Vertex, recob::Track>>();
 
-    //auto vid = getProductID< std::vector<recob::Vertex> >(evt);
-
     auto wireHandle = evt.getValidHandle<std::vector<recob::Wire>>(fWireProducerLabel);
     auto trkListHandle = evt.getValidHandle<std::vector<recob::Track>>(fTrackModuleLabel);
     auto spListHandle = evt.getValidHandle<std::vector<recob::SpacePoint>>(fTrackModuleLabel);
@@ -119,6 +119,10 @@ namespace nnet {
     art::FindManyP<recob::Hit> hitsFromTracks(trkListHandle, evt, fTrackModuleLabel);
     art::FindManyP<recob::SpacePoint> spFromTracks(trkListHandle, evt, fTrackModuleLabel);
     art::FindManyP<recob::Hit> hitsFromSPoints(spListHandle, evt, fTrackModuleLabel);
+
+    auto const clockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(evt);
+    auto const detProp =
+      art::ServiceHandle<detinfo::DetectorPropertiesService const>()->DataFor(evt, clockData);
 
     std::vector<std::pair<TVector3, double>> decays;
     for (size_t i = 0; i < hitsFromTracks.size(); ++i) {
@@ -134,7 +138,7 @@ namespace nnet {
         }
       }
 
-      DetectDecay(*wireHandle, hits, trkSpacePoints, decays);
+      DetectDecay(clockData, detProp, *wireHandle, hits, trkSpacePoints, decays);
     }
 
     double xyz[3];
@@ -162,7 +166,9 @@ namespace nnet {
   // ------------------------------------------------------
 
   bool
-  ParticleDecayId::DetectDecay(const std::vector<recob::Wire>& wires,
+  ParticleDecayId::DetectDecay(detinfo::DetectorClocksData const& clockData,
+                               detinfo::DetectorPropertiesData const& detProp,
+                               const std::vector<recob::Wire>& wires,
                                const std::vector<art::Ptr<recob::Hit>>& hits,
                                std::map<size_t, TVector3>& spoints,
                                std::vector<std::pair<TVector3, double>>& result)
@@ -184,7 +190,7 @@ namespace nnet {
         int tpc = wire_drift[v][i]->WireID().TPC;
         int cryo = wire_drift[v][i]->WireID().Cryostat;
 
-        fPointIdAlg.setWireDriftData(wires, v, tpc, cryo);
+        fPointIdAlg.setWireDriftData(clockData, detProp, wires, v, tpc, cryo);
 
         outputs[v][i] = fPointIdAlg.predictIdVector(wire_drift[v][i]->WireID().Wire,
                                                     wire_drift[v][i]->PeakTime())[0]; // p(decay)

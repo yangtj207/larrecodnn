@@ -26,12 +26,12 @@
 #include "messagefacility/MessageLogger/MessageLogger.h"
 
 #include "larcore/Geometry/Geometry.h"
+#include "lardata/ArtDataHelper/MVAWriter.h"
+#include "lardata/DetectorInfoServices/DetectorClocksService.h"
 #include "lardata/Utilities/AssociationUtil.h"
 #include "lardataobj/RecoBase/Cluster.h"
 #include "lardataobj/RecoBase/Hit.h"
 #include "lardataobj/RecoBase/Track.h"
-
-#include "lardata/ArtDataHelper/MVAWriter.h"
 #include "larrecodnn/ImagePatternAlgs/Tensorflow/PointIdAlg/PointIdAlg.h"
 
 #include <memory>
@@ -172,6 +172,10 @@ namespace nnet {
     auto hitID = fMVAWriter.initOutputs<recob::Hit>(
       fHitModuleLabel, hitPtrList.size(), fPointIdAlg.outputLabels());
 
+    auto const clockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(evt);
+    auto const detProp =
+      art::ServiceHandle<detinfo::DetectorPropertiesService const>()->DataFor(evt, clockData);
+
     std::vector<char> hitInFA(
       hitPtrList.size(),
       0); // tag hits in fid. area as 1, use 0 for hits close to the projectrion edges
@@ -183,7 +187,7 @@ namespace nnet {
           view = pview.first;
           if (!isViewSelected(view)) continue; // should not happen, hits were selected
 
-          fPointIdAlg.setWireDriftData(*wireHandle, view, tpc, cryo);
+          fPointIdAlg.setWireDriftData(clockData, detProp, *wireHandle, view, tpc, cryo);
 
           // (1) do all hits in this plane ------------------------------------------------
           for (size_t idx = 0; idx < pview.second.size(); idx += fBatchSize) {

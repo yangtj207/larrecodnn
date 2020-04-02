@@ -9,9 +9,9 @@
 // from cetpkgsupport v1_10_01.
 ////////////////////////////////////////////////////////////////////////
 
-#include "larcore/Geometry/Geometry.h"
-#include "larcorealg/Geometry/GeometryCore.h"
 #include "larcoreobj/SimpleTypesAndConstants/PhysicalConstants.h"
+#include "lardata/DetectorInfoServices/DetectorClocksService.h"
+#include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
 #include "lardata/Utilities/DatabaseUtil.h"
 #include "lardataobj/RecoBase/Cluster.h"
 #include "lardataobj/RecoBase/Hit.h"
@@ -39,14 +39,14 @@
 #include "messagefacility/MessageLogger/MessageLogger.h"
 
 #include "lardata/ArtDataHelper/MVAReader.h"
+#include "lardata/DetectorInfoServices/DetectorClocksService.h"
 
 #include "TH1.h"
 #include "TTree.h"
 
+#include <cmath>
 #include <fstream>
 #include <iostream>
-
-#include <cmath>
 
 #define MVA_LENGTH 4
 
@@ -88,20 +88,20 @@ namespace nnet {
     PointIdEffTest& operator=(PointIdEffTest&&) = delete;
 
   private:
-    virtual void beginRun(const art::Run& run) override;
+    void beginRun(const art::Run& run) override;
+    void beginJob() override;
+    void endJob() override;
+    void analyze(art::Event const& e) override;
 
-    virtual void beginJob() override;
-    virtual void endJob() override;
-
-    virtual void analyze(art::Event const& e) override;
-
-    void cleanup(void);
+    void cleanup();
 
     void countTruthDep(const std::vector<sim::SimChannel>& channels,
                        float& emLike,
                        float& trackLike) const;
 
-    void countPfpDep(const std::vector<recob::PFParticle>& pfparticles,
+    void countPfpDep(detinfo::DetectorClocksData const& clockData,
+                     detinfo::DetectorPropertiesData const& detProp,
+                     const std::vector<recob::PFParticle>& pfparticles,
                      const art::FindManyP<recob::Cluster>& pfpclus,
                      const art::FindManyP<recob::Hit>& cluhits,
                      float& emLike,
@@ -110,7 +110,9 @@ namespace nnet {
     bool isMuonDecaying(const simb::MCParticle& particle,
                         const std::unordered_map<int, const simb::MCParticle*>& particleMap) const;
 
-    int testCNN(const std::vector<sim::SimChannel>& channels,
+    int testCNN(detinfo::DetectorClocksData const& clockData,
+                detinfo::DetectorPropertiesData const& detProp,
+                const std::vector<sim::SimChannel>& channels,
                 const std::vector<art::Ptr<recob::Hit>>& hits,
                 const std::array<float, MVA_LENGTH>& cnn_out,
                 const std::vector<anab::FeatureVector<MVA_LENGTH>>& hit_outs,
@@ -150,8 +152,6 @@ namespace nnet {
 
     unsigned int fView;
 
-    geo::GeometryCore const* fGeometry;
-
     std::unordered_map<int, const simb::MCParticle*> fParticleMap;
 
     calo::CalorimetryAlg fCalorimetryAlg;
@@ -167,23 +167,17 @@ nnet::PointIdEffTest::PointIdEffTest(nnet::PointIdEffTest::Parameters const& con
   : art::EDAnalyzer(config)
   , fMcPid(-1)
   , fClSize(0)
-  ,
-
-  fTrkLikeIdx(-1)
+  , fTrkLikeIdx(-1)
   , fEmLikeIdx(-1)
   , fNoneIdx(-1)
   , fMichelLikeIdx(-1)
-  ,
-
-  fView(config().View())
+  , fView(config().View())
   , fCalorimetryAlg(config().CalorimetryAlg())
   , fSimulationProducerLabel(config().SimModuleLabel())
   , fPfpModuleLabel(config().PfpModuleLabel())
   , fNNetModuleLabel(config().NNetModuleLabel())
   , fSaveHitsFile(config().SaveHitsFile())
-{
-  fGeometry = &*(art::ServiceHandle<geo::Geometry const>());
-}
+{}
 
 void
 nnet::PointIdEffTest::beginRun(const art::Run&)
@@ -274,14 +268,11 @@ nnet::PointIdEffTest::endJob()
     shErr = fShBad[i] / float(fShBad[i] + fShOk[i]);
     trkErr = fTrkBad[i] / float(fTrkBad[i] + fTrkOk[i]);
     thrTree->Fill();
-
-    //std::cout << "Threshold " << thr << "  fShErr " << shErr << " fTrkErr " << trkErr << " sum:" << shErr + trkErr <<  std::endl;
   }
-  // std::cout << "Total " << fTotal << std::endl;
 }
 
 void
-nnet::PointIdEffTest::cleanup(void)
+nnet::PointIdEffTest::cleanup()
 {
   fParticleMap.clear();
 
@@ -337,13 +328,18 @@ nnet::PointIdEffTest::analyze(art::Event const& e)
   auto simChannelHandle = e.getValidHandle<std::vector<sim::SimChannel>>(fSimulationProducerLabel);
   countTruthDep(*simChannelHandle, fMcDepEM, fMcDepTrack);
 
+  auto const clockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(e);
+  auto const detProp =
+    art::ServiceHandle<detinfo::DetectorPropertiesService const>()->DataFor(e, clockData);
+
   // PFParticle selection results
   art::Handle<std::vector<recob::PFParticle>> pfpHandle;
   if (e.getByLabel(fPfpModuleLabel, pfpHandle)) {
     auto cluHandle = e.getValidHandle<std::vector<recob::Cluster>>(fPfpModuleLabel);
     const art::FindManyP<recob::Cluster> clusFromPfps(pfpHandle, e, fPfpModuleLabel);
     const art::FindManyP<recob::Hit> hitsFromClus(cluHandle, e, fPfpModuleLabel);
-    countPfpDep(*pfpHandle, clusFromPfps, hitsFromClus, fPfpDepEM, fPfpDepTrack);
+    countPfpDep(
+      clockData, detProp, *pfpHandle, clusFromPfps, hitsFromClus, fPfpDepEM, fPfpDepTrack);
   }
 
   // output from cnn's
@@ -373,8 +369,13 @@ nnet::PointIdEffTest::analyze(art::Event const& e)
       const std::vector<art::Ptr<recob::Hit>>& hits = hitsFromClusters.at(c);
       std::array<float, MVA_LENGTH> cnn_out = cluResults->getOutput(c);
 
-      testCNN(
-        *simChannelHandle, hits, cnn_out, hitResults.outputs(), c); // test hits in the cluster
+      testCNN(clockData,
+              detProp,
+              *simChannelHandle,
+              hits,
+              cnn_out,
+              hitResults.outputs(),
+              c); // test hits in the cluster
     }
 
     if (fTotHit > 0)
@@ -476,7 +477,9 @@ nnet::PointIdEffTest::countTruthDep(const std::vector<sim::SimChannel>& channels
 /******************************************/
 
 void
-nnet::PointIdEffTest::countPfpDep(const std::vector<recob::PFParticle>& pfparticles,
+nnet::PointIdEffTest::countPfpDep(detinfo::DetectorClocksData const& clockData,
+                                  detinfo::DetectorPropertiesData const& detProp,
+                                  const std::vector<recob::PFParticle>& pfparticles,
                                   const art::FindManyP<recob::Cluster>& pfpclus,
                                   const art::FindManyP<recob::Hit>& cluhits,
                                   float& emLike,
@@ -493,7 +496,8 @@ nnet::PointIdEffTest::countPfpDep(const std::vector<recob::PFParticle>& pfpartic
       const auto& hits = cluhits.at(c.key());
       for (const auto& h : hits) {
         if (h->View() == fView) {
-          hitdep += h->SummedADC() * fCalorimetryAlg.LifetimeCorrection(h->PeakTime());
+          hitdep +=
+            h->SummedADC() * fCalorimetryAlg.LifetimeCorrection(clockData, detProp, h->PeakTime());
         }
       }
     }
@@ -537,7 +541,9 @@ nnet::PointIdEffTest::isMuonDecaying(
 /******************************************/
 
 int
-nnet::PointIdEffTest::testCNN(const std::vector<sim::SimChannel>& channels,
+nnet::PointIdEffTest::testCNN(detinfo::DetectorClocksData const& clockData,
+                              detinfo::DetectorPropertiesData const& detProp,
+                              const std::vector<sim::SimChannel>& channels,
                               const std::vector<art::Ptr<recob::Hit>>& hits,
                               const std::array<float, MVA_LENGTH>& cnn_out,
                               const std::vector<anab::FeatureVector<MVA_LENGTH>>& hit_outs,
@@ -617,7 +623,8 @@ nnet::PointIdEffTest::testCNN(const std::vector<sim::SimChannel>& channels,
     totEnTrk += hitEnTrk;
     totEnMichel += hitEnMichel;
 
-    double hitAdc = hit->SummedADC() * fCalorimetryAlg.LifetimeCorrection(hit->PeakTime());
+    double hitAdc =
+      hit->SummedADC() * fCalorimetryAlg.LifetimeCorrection(clockData, detProp, hit->PeakTime());
     fTotHit += hitAdc;
 
     int hitPidMc_0p5 = -1;
@@ -747,8 +754,9 @@ nnet::PointIdEffTest::testCNN(const std::vector<sim::SimChannel>& channels,
 
       fHitsOutFile << fRun << " " << fEvent << " " << h->WireID().TPC << " " << h->WireID().Wire
                    << " " << h->PeakTime() << " "
-                   << h->SummedADC() * fCalorimetryAlg.LifetimeCorrection(h->PeakTime()) << " "
-                   << mcHitPid[h.key()] << " " << fPidValue << " " << hitPidValue;
+                   << h->SummedADC() *
+                        fCalorimetryAlg.LifetimeCorrection(clockData, detProp, h->PeakTime())
+                   << " " << mcHitPid[h.key()] << " " << fPidValue << " " << hitPidValue;
 
       if (fMichelLikeIdx >= 0) {
         fHitsOutFile << " " << vout[fMichelLikeIdx]; // is michel?

@@ -59,7 +59,6 @@ private:
 
 nnet::EvaluateROIEff::EvaluateROIEff(fhicl::ParameterSet const& p)
   : EDAnalyzer{p}, fWireProducerLabel(p.get<art::InputTag>("WireProducerLabel", ""))
-// More initializers here.
 {
   // Call appropriate consumes<>() for any products to be retrieved by this module.
 }
@@ -69,8 +68,9 @@ nnet::EvaluateROIEff::analyze(art::Event const& e)
 {
 
   auto const* geo = lar::providerFrom<geo::Geometry>();
-  auto const* detprop = lar::providerFrom<detinfo::DetectorPropertiesService>();
-  auto const* tclk = lar::providerFrom<detinfo::DetectorClocksService>();
+  auto const clockData = art::ServiceHandle<detinfo::DetectorClocksService>()->DataFor(e);
+  auto const detProp =
+    art::ServiceHandle<detinfo::DetectorPropertiesService>()->DataFor(e, clockData);
   auto const& chStatus = art::ServiceHandle<lariov::ChannelStatusService>()->GetProvider();
 
   art::Handle<std::vector<recob::Wire>> wireListHandle;
@@ -94,14 +94,12 @@ nnet::EvaluateROIEff::analyze(art::Event const& e)
 
       auto const& energyDeposits = timeSlice.second;
       auto const tpctime = timeSlice.first;
-      int tdctick = static_cast<int>(tclk->TPCTDC2Tick(double(tpctime)));
-      //if(tdctick!=tpctime)std::cout << "tpctime: " << tpctime << ", tdctick: " << tdctick << std::endl;
-      if (tdctick < 0 || tdctick > int(detprop->ReadOutWindowSize()) - 1) continue;
+      int tdctick = static_cast<int>(clockData.TPCTDC2Tick(double(tpctime)));
+      if (tdctick < 0 || tdctick > int(detProp.ReadOutWindowSize()) - 1) continue;
       double totalE = 0;
       for (auto const& energyDeposit : energyDeposits) {
         totalE += energyDeposit.energy;
       }
-      //std::cout<<totalE<<std::endl;
       h_energy[view]->Fill(totalE);
       for (auto& wire : wires) {
         if (wire->Channel() != ch1) continue;

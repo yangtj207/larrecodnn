@@ -157,20 +157,10 @@ nnet::WaveformRoiFinder::produce(art::Event& e)
   std::vector<art::Ptr<raw::RawDigit>> rawlist;
   if (e.getByLabel(fRawProducerLabel, rawListHandle)) art::fill_ptr_vector(rawlist, rawListHandle);
 
-  std::cout << fRawProducerLabel << std::endl;
-
-  art::Handle<std::vector<raw::RawDigit>> rawListHandle;
-  std::vector<art::Ptr<raw::RawDigit>> rawlist;
-  if (e.getByLabel(fRawProducerLabel, rawListHandle)) art::fill_ptr_vector(rawlist, rawListHandle);
-
-  //std::cout<<rawlist.size()<<std::endl;
-
   art::Handle<std::vector<recob::Wire>> wireListHandle;
   std::vector<art::Ptr<recob::Wire>> wirelist;
   if (e.getByLabel(fWireProducerLabel, wireListHandle))
     art::fill_ptr_vector(wirelist, wireListHandle);
-
-  //auto wireHandle = e.getValidHandle< std::vector<recob::Wire> >(fWireProducerLabel);
 
   std::unique_ptr<std::vector<recob::Wire>> outwires(new std::vector<recob::Wire>);
 
@@ -178,8 +168,6 @@ nnet::WaveformRoiFinder::produce(art::Event& e)
 
   //##############################
   //### Looping over the wires ###
-  //for(size_t wireIter = 0; wireIter < wireHandle->size(); wireIter++){
-  //std::cout<<"size = "<<(rawlist.empty()?wirelist.size():rawlist.size())<<std::endl;
   for (unsigned int ich = 0; ich < (rawlist.empty() ? wirelist.size() : rawlist.size()); ++ich) {
 
     std::vector<float> inputsignal(fWaveformSize);
@@ -187,7 +175,6 @@ nnet::WaveformRoiFinder::produce(art::Event& e)
 
     if (!wirelist.empty()) {
       const auto& wire = wirelist[ich];
-      //art::Ptr<recob::Wire>   wire(wireHandle, wireIter);
       const auto& signal = wire->Signal();
 
       for (size_t itck = 0; itck < adc.size(); ++itck) {
@@ -196,7 +183,6 @@ nnet::WaveformRoiFinder::produce(art::Event& e)
       }
     }
     else if (!rawlist.empty()) {
-      //std::cout<<ich<<std::endl;
       const auto& digitVec = rawlist[ich];
       std::vector<short> rawadc(fWaveformSize);
       raw::Uncompress(digitVec->ADCs(), rawadc, digitVec->GetPedestal(), digitVec->Compression());
@@ -238,7 +224,6 @@ nnet::WaveformRoiFinder::produce(art::Event& e)
 
     recob::Wire::RegionsOfInterest_t rois(fWaveformSize);
 
-    //for (size_t i = 0; i<predv.size(); ++i){
     for (size_t i = 0; i < fWaveformSize; ++i) {
       bool isroi = false;
       // For ProtoDUNE, shape of predv is (40,1) for 40 windows and a single output/categor.
