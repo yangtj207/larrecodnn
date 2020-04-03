@@ -1,6 +1,4 @@
 include_directories( $ENV{TENSORFLOW_INC}/absl )
-include_directories($ENV{TRTIS_CLIENTS_INC})
-cet_find_library(TRTIS_CLIENTS_LIBRARY NAMES request PATHS $ENV{TRTIS_CLIENTS_LIB})
 
 art_make(
           LIB_LIBRARIES larreco_RecoAlg_ImagePatternAlgs_DataProvider
@@ -23,7 +21,6 @@ art_make(
                         art_Utilities
                         canvas
                         ${MF_MESSAGELOGGER}
-			${TRTIS_CLIENTS_LIBRARY}
                         ${FHICLCPP}
                         cetlib cetlib_except
                         ${CLHEP}
