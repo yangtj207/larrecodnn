@@ -13,25 +13,22 @@ namespace wavrec_tool
   class WaveformRecogTf : public IWaveformRecog {
   public:
     explicit WaveformRecogTf(const fhicl::ParameterSet& pset);
-    ~WaveformRecogTf();
 
-    void configure(const fhicl::ParameterSet& pset) override;
     std::vector< std::vector<float> > predictWaveformType( const std::vector< std::vector<float> >& ) const override;
 
-  protected:
-    std::string findFile(const char* fileName) const;
-    
   private:
-    mutable std::unique_ptr<tf::Graph> g; // network graph
+    std::unique_ptr<tf::Graph> g; // network graph
     std::string fNNetModelFilePath;
     std::vector< std::string > fNNetOutputPattern;
+    std::string findFile(const char* fileName) const;
 
   };
 
   // ------------------------------------------------------
   WaveformRecogTf::WaveformRecogTf(const fhicl::ParameterSet & pset)
   {
-    configure(pset);
+    fNNetModelFilePath = pset.get<std::string>("NNetModelFile", "mymodel.pb");
+    fNNetOutputPattern = pset.get<std::vector<std::string> >("NNetOutputPattern", {"cnn_output", "dense_3"});
     if ((fNNetModelFilePath.length() > 3) &&
         (fNNetModelFilePath.compare(fNNetModelFilePath.length() - 3, 3, ".pb") == 0)) {
       g = tf::Graph::create(findFile(fNNetModelFilePath.c_str()).c_str(), fNNetOutputPattern);
@@ -40,21 +37,6 @@ namespace wavrec_tool
     } else {
       mf::LogError("WaveformRecogTf") << "File name extension not supported.";
     }
-  }
-
-  // ------------------------------------------------------
-  WaveformRecogTf::~WaveformRecogTf()
-  {
-  }
-
-  // ------------------------------------------------------
-  void WaveformRecogTf::configure(const fhicl::ParameterSet& pset)
-  {
-    //get parameters
-    fNNetModelFilePath = pset.get<std::string>("NNetModelFile", "mymodel.pb");
-    fNNetOutputPattern = pset.get<std::vector<std::string> >("NNetOutputPattern", {"cnn_output", "dense_3"});
-
-    return;
   }
 
   // ------------------------------------------------------

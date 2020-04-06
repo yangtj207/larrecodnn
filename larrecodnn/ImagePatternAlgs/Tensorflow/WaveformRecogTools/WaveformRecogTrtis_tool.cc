@@ -17,9 +17,7 @@ namespace wavrec_tool
   class WaveformRecogTrtis : public IWaveformRecog {
   public:
     explicit WaveformRecogTrtis(const fhicl::ParameterSet& pset);
-    ~WaveformRecogTrtis();
 
-    void configure(const fhicl::ParameterSet& pset) override;
     std::vector< std::vector<float> > predictWaveformType( const std::vector< std::vector<float> >& ) const override;
 
   private:
@@ -29,7 +27,6 @@ namespace wavrec_tool
     int64_t fTrtisModelVersion;
 
     std::unique_ptr<nic::InferContext> ctx; // tRTis context
-    mutable nic::Error err;
     std::shared_ptr<nic::InferContext::Input> model_input;
 
   };
@@ -37,10 +34,13 @@ namespace wavrec_tool
   // ------------------------------------------------------
   WaveformRecogTrtis::WaveformRecogTrtis(const fhicl::ParameterSet & pset)
   {
-    configure(pset);
+    fTrtisModelName    = pset.get<std::string>("TrtisModelName","mymodel.pb");
+    fTrtisURL          = pset.get<std::string>("TrtisURL","localhost:8001");
+    fTrtisVerbose      = pset.get<bool>("TrtisVerbose",false);
+    fTrtisModelVersion = pset.get<int64_t>("TrtisModelVersion",-1);
 
     // ... Create the inference context for the specified model.
-    err = nic::InferGrpcContext::Create(&ctx, fTrtisURL, fTrtisModelName, fTrtisModelVersion, fTrtisVerbose);
+    auto err = nic::InferGrpcContext::Create(&ctx, fTrtisURL, fTrtisModelName, fTrtisModelVersion, fTrtisVerbose);
     if (!err.IsOk()) {
       throw cet::exception("WaveformRecogTrtis") << "unable to create tRTis inference context: " << err << std::endl;
     }
@@ -61,22 +61,6 @@ namespace wavrec_tool
   }
 
   // ------------------------------------------------------
-  WaveformRecogTrtis::~WaveformRecogTrtis()
-  {
-  }
-
-  // ------------------------------------------------------
-  void WaveformRecogTrtis::configure(const fhicl::ParameterSet& pset)
-  {
-    //get parameters
-    fTrtisModelName    = pset.get<std::string>("TrtisModelName","mymodel.pb");
-    fTrtisURL          = pset.get<std::string>("TrtisURL","localhost:8001");
-    fTrtisVerbose      = pset.get<bool>("TrtisVerbose",false);
-    fTrtisModelVersion = pset.get<int64_t>("TrtisModelVersion",-1);
-    return;
-  }
-
-  // ------------------------------------------------------
   std::vector< std::vector<float> > WaveformRecogTrtis::predictWaveformType( const std::vector< std::vector<float> >& waveforms) const
   {
     if (waveforms.empty() || waveforms.front().empty()){
@@ -88,7 +72,7 @@ namespace wavrec_tool
     // ~~~~ Configure context options
  
     std::unique_ptr<nic::InferContext::Options> options;
-    err = nic::InferContext::Options::Create(&options);
+    auto err = nic::InferContext::Options::Create(&options);
     if (!err.IsOk()) {
       throw cet::exception("WaveformRecogTrtis") << "failed initializing tRTis infer options: " << err << std::endl;
     }

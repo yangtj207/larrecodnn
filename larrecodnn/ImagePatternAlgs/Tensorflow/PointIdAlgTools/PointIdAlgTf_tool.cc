@@ -20,11 +20,7 @@ namespace PointIdAlgTools
 
   class PointIdAlgTf : public IPointIdAlg {
   public:
-    explicit PointIdAlgTf(const fhicl::ParameterSet& pset) :
-             PointIdAlgTf(fhicl::Table<Config>(pset, {})())
-	     {}
-    explicit PointIdAlgTf(const Config& config);
-    ~PointIdAlgTf();
+    explicit PointIdAlgTf(fhicl::Table<Config> const& table);
 
     std::vector<float> Run(std::vector< std::vector<float> > const & inp2d) const override;
     std::vector< std::vector<float> > Run(std::vector< std::vector< std::vector<float> > > const & inps, int samples = -1) const override;
@@ -33,31 +29,31 @@ namespace PointIdAlgTools
     std::string findFile(const char* fileName) const;
     
   private:
-    mutable std::unique_ptr<tf::Graph> g; // network graph
+    std::unique_ptr<tf::Graph> g; // network graph
     std::vector<std::string> fNNetOutputPattern;
     std::string fNNetModelFilePath;
 
   };
 
   // ------------------------------------------------------
-  PointIdAlgTf::PointIdAlgTf(const Config& config) : img::DataProviderAlg(config)
+  PointIdAlgTf::PointIdAlgTf(fhicl::Table<Config> const& table) : img::DataProviderAlg(table())
   {
     // ... Get common config vars
-    fNNetOutputs = config.NNetOutputs();
-    fPatchSizeW = config.PatchSizeW();
-    fPatchSizeD = config.PatchSizeD();
+    fNNetOutputs = table().NNetOutputs();
+    fPatchSizeW = table().PatchSizeW();
+    fPatchSizeD = table().PatchSizeD();
     fCurrentWireIdx = 99999;
     fCurrentScaledDrift = 99999;
 
     // ... Get "optional" config vars specific to tf interface
     std::string s_cfgvr;
-    if ( config.NNetModelFile(s_cfgvr) ) {
+    if ( table().NNetModelFile(s_cfgvr) ) {
       fNNetModelFilePath = s_cfgvr;
     } else {
       fNNetModelFilePath = "mycnn";
     }
     std::vector<std::string> vs_cfgvr;
-    if ( config.NNetOutputPattern(vs_cfgvr) ) {
+    if ( table().NNetOutputPattern(vs_cfgvr) ) {
       fNNetOutputPattern = vs_cfgvr;
     } else {
       fNNetOutputPattern = {"cnn_output", "_netout"};
@@ -73,11 +69,6 @@ namespace PointIdAlgTools
     }
 
     resizePatch();
-  }
-
-  // ------------------------------------------------------
-  PointIdAlgTf::~PointIdAlgTf()
-  {
   }
 
   // ------------------------------------------------------

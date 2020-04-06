@@ -23,17 +23,14 @@ namespace PointIdAlgTools
              PointIdAlgKeras(fhicl::Table<Config>(pset, {})())
 	     {}
     explicit PointIdAlgKeras(const Config& config);
-    ~PointIdAlgKeras();
 
     std::vector<float> Run(std::vector< std::vector<float> > const & inp2d) const override;
     std::vector< std::vector<float> > Run(std::vector< std::vector< std::vector<float> > > const & inps, int samples = -1) const override;
 
-  protected:
-    std::string findFile(const char* fileName) const;
-    
   private:
     std::unique_ptr<keras::KerasModel> m;
     std::string fNNetModelFilePath;
+    std::string findFile(const char* fileName) const;
 
   };
 
@@ -67,11 +64,6 @@ namespace PointIdAlgTools
   }
 
   // ------------------------------------------------------
-  PointIdAlgKeras::~PointIdAlgKeras()
-  {
-  }
-
-  // ------------------------------------------------------
   std::string PointIdAlgKeras::findFile(const char* fileName) const
   {
     std::string fname_out;
@@ -94,11 +86,9 @@ namespace PointIdAlgTools
     std::vector< std::vector< std::vector<float> > > inp3d;
     inp3d.push_back(inp2d); // lots of copy, should add 2D to keras...
 
-    keras::DataChunk *sample = new keras::DataChunk2D();
-    sample->set_data(inp3d); // and more copy...
-    std::vector<float> out = m->compute_output(sample);
-    delete sample;
-    return out;
+    keras::DataChunk2D sample;
+    sample.set_data(inp3d);
+    return m->compute_output(&sample);
   }
 
   // ------------------------------------------------------

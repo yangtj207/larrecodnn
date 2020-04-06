@@ -19,11 +19,7 @@ namespace PointIdAlgTools
 
   class PointIdAlgTrtis : public IPointIdAlg {
   public:
-    explicit PointIdAlgTrtis(const fhicl::ParameterSet& pset) :
-             PointIdAlgTrtis(fhicl::Table<Config>(pset, {})())
-	     {}
-    explicit PointIdAlgTrtis(const Config& config);
-    ~PointIdAlgTrtis();
+    explicit PointIdAlgTrtis(fhicl::Table<Config> const& table);
 
     std::vector<float> Run(std::vector< std::vector<float> > const & inp2d) const override;
     std::vector< std::vector<float> > Run(std::vector< std::vector< std::vector<float> > > const & inps, int samples = -1) const override;
@@ -35,18 +31,17 @@ namespace PointIdAlgTools
     int64_t fTrtisModelVersion;
 
     std::unique_ptr<nic::InferContext> ctx; // tRTis context
-    mutable nic::Error err;
     std::shared_ptr<nic::InferContext::Input> model_input;
 
   };
 
   // ------------------------------------------------------
-  PointIdAlgTrtis::PointIdAlgTrtis(const Config& config) : img::DataProviderAlg(config)
+  PointIdAlgTrtis::PointIdAlgTrtis(fhicl::Table<Config> const& table) : img::DataProviderAlg(table())
   {
     // ... Get common config vars
-    fNNetOutputs = config.NNetOutputs();
-    fPatchSizeW = config.PatchSizeW();
-    fPatchSizeD = config.PatchSizeD();
+    fNNetOutputs = table().NNetOutputs();
+    fPatchSizeW = table().PatchSizeW();
+    fPatchSizeD = table().PatchSizeD();
     fCurrentWireIdx = 99999;
     fCurrentScaledDrift = 99999;
 
@@ -54,29 +49,29 @@ namespace PointIdAlgTools
     std::string s_cfgvr;
     int64_t i_cfgvr;
     bool b_cfgvr;
-    if ( config.TrtisModelName(s_cfgvr) ) {
+    if ( table().TrtisModelName(s_cfgvr) ) {
       fTrtisModelName = s_cfgvr;
     } else {
       fTrtisModelName = "mycnn";
     }
-    if ( config.TrtisURL(s_cfgvr) ) {
+    if ( table().TrtisURL(s_cfgvr) ) {
       fTrtisURL = s_cfgvr;
     } else {
       fTrtisURL = "localhost:8001";
     }
-    if ( config.TrtisVerbose(b_cfgvr) ) {
+    if ( table().TrtisVerbose(b_cfgvr) ) {
       fTrtisVerbose = b_cfgvr;
     } else {
       fTrtisVerbose = false;
     }
-    if ( config.TrtisModelVersion(i_cfgvr) ) {
+    if ( table().TrtisModelVersion(i_cfgvr) ) {
       fTrtisModelVersion = i_cfgvr;
     } else {
       fTrtisModelVersion = -1;
     }
      
     // ... Create the inference context for the specified model.
-    err = nic::InferGrpcContext::Create(&ctx, fTrtisURL, fTrtisModelName, fTrtisModelVersion, fTrtisVerbose);
+    auto err = nic::InferGrpcContext::Create(&ctx, fTrtisURL, fTrtisModelName, fTrtisModelVersion, fTrtisVerbose);
     if (!err.IsOk()) {
       throw cet::exception("PointIdAlgTrtis") << "unable to create tRTis inference context: " << err << std::endl;
     }
@@ -98,11 +93,6 @@ namespace PointIdAlgTools
   }
 
   // ------------------------------------------------------
-  PointIdAlgTrtis::~PointIdAlgTrtis()
-  {
-  }
-
-  // ------------------------------------------------------
   std::vector<float> PointIdAlgTrtis::Run(std::vector< std::vector<float> > const & inp2d) const
   {
     size_t nrows = inp2d.size(), ncols = inp2d.front().size();
@@ -110,7 +100,7 @@ namespace PointIdAlgTools
     // ~~~~ Configure context options
 
     std::unique_ptr<nic::InferContext::Options> options;
-    err = nic::InferContext::Options::Create(&options);
+    auto err = nic::InferContext::Options::Create(&options);
     if (!err.IsOk()) {
       throw cet::exception("PointIdAlgTrtis") << "failed initializing tRTis infer options: " << err << std::endl;
     }
@@ -192,7 +182,7 @@ namespace PointIdAlgTools
     // ~~~~ Configure context options
  
     std::unique_ptr<nic::InferContext::Options> options;
-    err = nic::InferContext::Options::Create(&options);
+    auto err = nic::InferContext::Options::Create(&options);
     if (!err.IsOk()) {
       throw cet::exception("PointIdAlgTrtis") << "failed initializing tRTis infer options: " << err << std::endl;
     }

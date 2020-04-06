@@ -71,7 +71,7 @@ namespace PointIdAlgTools
 	    virtual std::vector< std::vector<float> > Run(std::vector< std::vector< std::vector<float> > > const & inps, int samples = -1) const = 0;
 
 	    // calculate single-value prediction (2-class probability) for [wire, drift] point
-        float predictIdValue(unsigned int wire, float drift, size_t outIdx = 0) const
+        float predictIdValue(unsigned int wire, float drift, size_t outIdx = 0)
         {
           float result = 0.;
 
@@ -91,7 +91,7 @@ namespace PointIdAlgTools
         }
 
         // Calculate multi-class probabilities for [wire, drift] point
-        std::vector<float> predictIdVector(unsigned int wire, float drift) const
+        std::vector<float> predictIdVector(unsigned int wire, float drift)
         {
           std::vector<float> result;
 
@@ -109,7 +109,7 @@ namespace PointIdAlgTools
         }
 
         // Calculate multi-class probabilities for a vector of [wire, drift] points
-        std::vector< std::vector<float> > predictIdVectors( const std::vector<std::pair<unsigned int,float> >& points) const
+        std::vector< std::vector<float> > predictIdVectors( const std::vector<std::pair<unsigned int,float> >& points)
         {
           if (points.empty()){
             return std::vector< std::vector<float> >();
@@ -146,10 +146,10 @@ namespace PointIdAlgTools
     protected:
 	    std::vector< std::string > fNNetOutputs;
         size_t fPatchSizeW, fPatchSizeD;
-        mutable std::vector< std::vector<float> > fWireDriftPatch;  // patch data around the identified point
-        mutable size_t fCurrentWireIdx, fCurrentScaledDrift;
+        std::vector< std::vector<float> > fWireDriftPatch;  // patch data around the identified point
+        size_t fCurrentWireIdx, fCurrentScaledDrift;
 
-        bool bufferPatch(size_t wire, float drift, std::vector< std::vector<float> > & patch) const
+        bool bufferPatch(size_t wire, float drift, std::vector< std::vector<float> > & patch)
         {
           if (fDownscaleFullView)
           {
@@ -172,7 +172,7 @@ namespace PointIdAlgTools
           }
         }
 
-        bool bufferPatch(size_t wire, float drift) const { return bufferPatch(wire, drift, fWireDriftPatch); }
+        bool bufferPatch(size_t wire, float drift) { return bufferPatch(wire, drift, fWireDriftPatch); }
 
         void resizePatch(void)
         {
