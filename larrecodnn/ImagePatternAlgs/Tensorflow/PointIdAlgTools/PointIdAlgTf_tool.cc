@@ -27,7 +27,7 @@ namespace PointIdAlgTools
 
   protected:
     std::string findFile(const char* fileName) const;
-    
+
   private:
     std::unique_ptr<tf::Graph> g; // network graph
     std::vector<std::string> fNNetOutputPattern;
@@ -58,7 +58,7 @@ namespace PointIdAlgTools
     } else {
       fNNetOutputPattern = {"cnn_output", "_netout"};
     }
-    
+
     if ((fNNetModelFilePath.length() > 3) &&
         (fNNetModelFilePath.compare(fNNetModelFilePath.length() - 3, 3, ".pb") == 0)) {
       g = tf::Graph::create(findFile(fNNetModelFilePath.c_str()).c_str(), fNNetOutputPattern);
@@ -114,11 +114,11 @@ namespace PointIdAlgTools
     if ((samples == 0) || inps.empty() || inps.front().empty() || inps.front().front().empty()) {
       return std::vector< std::vector<float> >();
     }
-  
+
     if ((samples == -1) || (samples > (long long int)inps.size())) { samples = inps.size(); }
 
     long long int rows = inps.front().size(), cols = inps.front().front().size();
-    
+
     tensorflow::Tensor _x(tensorflow::DT_FLOAT, tensorflow::TensorShape({ samples, rows, cols, 1 }));
     auto input_map = _x.tensor<float, 4>();
     for (long long int s = 0; s < samples; ++s) {

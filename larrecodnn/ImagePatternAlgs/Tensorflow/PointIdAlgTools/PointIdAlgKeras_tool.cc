@@ -51,7 +51,7 @@ namespace PointIdAlgTools
     } else {
       fNNetModelFilePath = "mycnn";
     }
-    
+
     if ((fNNetModelFilePath.length() > 5) &&
       (fNNetModelFilePath.compare(fNNetModelFilePath.length() - 5, 5, ".nnet") == 0)){
       m = std::make_unique<keras::KerasModel>(findFile(fNNetModelFilePath.c_str() ).c_str() );
@@ -98,7 +98,7 @@ namespace PointIdAlgTools
     if ((samples == 0) || inps.empty() || inps.front().empty() || inps.front().front().empty()) {
       return std::vector< std::vector<float> >();
     }
-  
+
     if ((samples == -1) || (samples > (long long int)inps.size())) { samples = inps.size(); }
 
     std::vector< std::vector<float> > out;

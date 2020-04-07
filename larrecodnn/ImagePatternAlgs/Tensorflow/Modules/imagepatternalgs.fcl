@@ -26,7 +26,7 @@ standard_pointidtrainingnuevent:
 
     GenModuleLabel:  "generator"
     FidVolCut:	      20.0
-    Crop:             true		
+    Crop:             true
 
     TrainingDataAlg:        @local::standard_trainingdataalg
 }
@@ -36,7 +36,7 @@ standard_pointidefftest:
 	module_type:            "PointIdEffTest"
 	CalorimetryAlg:         @local::standard_calorimetryalgmc
 
-    SimModuleLabel:         "largeant"	
+    SimModuleLabel:         "largeant"
 
     PfpModuleLabel:         "pandora" # for comparison
 

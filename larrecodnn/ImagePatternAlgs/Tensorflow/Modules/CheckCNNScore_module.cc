@@ -92,17 +92,17 @@ void pdsp::CheckCNNScore::analyze(art::Event const& e)
   score_none.clear();
 
   anab::MVAReader<recob::Hit,3> hitResults(e, fNNetModuleLabel);
-  
+
   art::Handle< std::vector<recob::Hit> > hitListHandle;
   std::vector<art::Ptr<recob::Hit> > hitlist;
   if (e.getByLabel(fHitsModuleLabel,hitListHandle))
     art::fill_ptr_vector(hitlist, hitListHandle);
 
-  // loop over hits 
+  // loop over hits
   //  for (size_t h = 0; h < hitResults.size(); ++h) {
   for (auto & hit : hitlist){
-    
-    // Get cnn output for hit h 
+
+    // Get cnn output for hit h
     std::array<float,3> cnn_out = hitResults.getOutput(hit);
 
     if (hit->WireID().Plane == 2){
@@ -111,7 +111,7 @@ void pdsp::CheckCNNScore::analyze(art::Event const& e)
       plane.push_back(hit->WireID().Plane);
       wire.push_back(hit->WireID().Wire);
       charge.push_back(hit->Integral());
-      peakt.push_back(hit->PeakTime());     
+      peakt.push_back(hit->PeakTime());
       score_inel.push_back(cnn_out[hitResults.getIndex("inel")]);
       score_el.push_back(cnn_out[hitResults.getIndex("el")]);
       score_none.push_back(cnn_out[hitResults.getIndex("none")]);

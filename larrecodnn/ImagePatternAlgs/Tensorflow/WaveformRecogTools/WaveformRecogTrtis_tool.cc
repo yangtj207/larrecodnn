@@ -70,7 +70,7 @@ namespace wavrec_tool
     size_t usamples = waveforms.size(), numtcks = waveforms.front().size();
 
     // ~~~~ Configure context options
- 
+
     std::unique_ptr<nic::InferContext::Options> options;
     auto err = nic::InferContext::Options::Create(&options);
     if (!err.IsOk()) {
@@ -95,7 +95,7 @@ namespace wavrec_tool
     }
 
     size_t sbuff_byte_size = numtcks*sizeof(float);
-  
+
     for (size_t idx = 0; idx < usamples; ++idx) {
       err = model_input->SetRaw(reinterpret_cast<const uint8_t*>(waveforms[idx].data()),sbuff_byte_size);
       if (!err.IsOk()) {

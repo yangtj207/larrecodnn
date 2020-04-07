@@ -69,7 +69,7 @@ namespace PointIdAlgTools
     } else {
       fTrtisModelVersion = -1;
     }
-     
+
     // ... Create the inference context for the specified model.
     auto err = nic::InferGrpcContext::Create(&ctx, fTrtisURL, fTrtisModelName, fTrtisModelVersion, fTrtisVerbose);
     if (!err.IsOk()) {
@@ -127,7 +127,7 @@ namespace PointIdAlgTools
 
     // ..flatten the 2d array into contiguous 1d block
     for (size_t ir = 0; ir < nrows; ++ir){
-      std::copy(inp2d[ir].begin(), inp2d[ir].end(), fa.begin()+(ir*ncols)); 
+      std::copy(inp2d[ir].begin(), inp2d[ir].end(), fa.begin()+(ir*ncols));
     }
     err = model_input->SetRaw(reinterpret_cast<uint8_t*>(fa.data()),sbuff_byte_size);
     if (!err.IsOk()) {
@@ -180,7 +180,7 @@ namespace PointIdAlgTools
     size_t nrows = inps.front().size(), ncols = inps.front().front().size();
 
     // ~~~~ Configure context options
- 
+
     std::unique_ptr<nic::InferContext::Options> options;
     auto err = nic::InferContext::Options::Create(&options);
     if (!err.IsOk()) {
@@ -206,11 +206,11 @@ namespace PointIdAlgTools
 
     size_t sbuff_byte_size = (nrows*ncols)*sizeof(float);
     std::vector< std::vector<float> > fa(usamples, std::vector<float>(sbuff_byte_size));
-  
+
     for (size_t idx = 0; idx < usamples; ++idx) {
       // ..first flatten the 2d array into contiguous 1d block
       for (size_t ir = 0; ir < nrows; ++ir){
-        std::copy(inps[idx][ir].begin(), inps[idx][ir].end(), fa[idx].begin()+(ir*ncols)); 
+        std::copy(inps[idx][ir].begin(), inps[idx][ir].end(), fa[idx].begin()+(ir*ncols));
       }
       err = model_input->SetRaw(reinterpret_cast<uint8_t*>(fa[idx].data()),sbuff_byte_size);
       if (!err.IsOk()) {
