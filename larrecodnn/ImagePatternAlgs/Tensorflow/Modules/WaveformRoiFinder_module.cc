@@ -65,7 +65,7 @@ private:
   unsigned int fStrideLength;		// Offset (in #time ticks) between scan windows
   unsigned int fNumStrides;
   unsigned int fLastWindowSize;
-  
+
   art::InputTag fWireProducerLabel;
   std::unique_ptr<wavrec_tool::IWaveformRecog> fWaveformRecogTool;
 
@@ -120,7 +120,7 @@ nnet::WaveformRoiFinder::WaveformRoiFinder(fhicl::ParameterSet const& p)
   unsigned int numwindows = fNumStrides + 1;
   std::cout << " !!!!! WaveformRoiFinder: WindowSize = " << fWindowSize << ", StrideLength = "
             << fStrideLength << ", dmn/StrideLength = " << dmn/fStrideLength << std::endl;
-  std::cout << "       dmn = " << dmn << ", NumStrides = " << fNumStrides << ", overshoot = " << overshoot 
+  std::cout << "       dmn = " << dmn << ", NumStrides = " << fNumStrides << ", overshoot = " << overshoot
             << ", LastWindowSize = " << fLastWindowSize << ", numwindows = " << numwindows << std::endl;
 
   // Signal/Noise waveform recognition tool
@@ -149,7 +149,7 @@ void nnet::WaveformRoiFinder::produce(art::Event& e)
     for (size_t itck = 0; itck < adc.size(); ++itck){
       adc[itck] = (signal[itck] - meanvec[itck])/scalevec[itck];
     }
- 
+
     // .. create a vector of windows
     std::vector<std::vector<float>>wwv(fNumStrides+1, std::vector<float>(fWindowSize,0.));
     std::vector<std::vector<float>>predv(fNumStrides+1, std::vector<float>(1,0.));
@@ -167,14 +167,14 @@ void nnet::WaveformRoiFinder::produce(art::Event& e)
     }
     // .. last window is a special case
     j1 = fNumStrides*fStrideLength;
-    j2 = j1 + fLastWindowSize;    
+    j2 = j1 + fLastWindowSize;
     k=0;
     for (unsigned int j=j1; j<j2; j++){
       wwv[fNumStrides][k]=adc[j];
       k++;
     }
-    
-    // ... use waveform recognition CNN to perform inference on each window 
+
+    // ... use waveform recognition CNN to perform inference on each window
     predv = fWaveformRecogTool->predictWaveformType(wwv);
 
     std::vector<float> sigs;
