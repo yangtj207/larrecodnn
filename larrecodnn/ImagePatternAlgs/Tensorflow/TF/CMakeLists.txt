@@ -1,6 +1,6 @@
 include_directories( $ENV{TENSORFLOW_INC}/absl )
-art_make( 
-          LIB_LIBRARIES 
+art_make(
+          LIB_LIBRARIES
 			${FHICLCPP}
 			cetlib cetlib_except
 			${TENSORFLOW}
