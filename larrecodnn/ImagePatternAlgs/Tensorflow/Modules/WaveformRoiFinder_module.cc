@@ -191,7 +191,10 @@ void nnet::WaveformRoiFinder::produce(art::Event& e)
       for (size_t j = 0; j<predv.size(); ++j){
         if (i >= j*fStrideLength &&
             i < j*fStrideLength + fWindowSize){
-          if (predv[j][0]>0.5) isroi = true;
+          if (predv[j][0]>0.5){
+            isroi = true;
+            break;
+          }
         }
       }
       if (isroi){
