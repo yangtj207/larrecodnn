@@ -59,14 +59,11 @@ include(ArtMake)
 include(BuildPlugins)
 
 # cannot build tensorflow with our clang
-# tensorflow and trtis_clients are artificially linked
 # at this time, trtis_clients is only available for python 3
-# therefore, we need to check to see if BOTH tesorflow and trtis_clients are available
-if(( DEFINED ENV{TENSORFLOW_DIR} ) AND ( DEFINED ENV{TRTIS_CLIENTS_DIR} ))
+if( DEFINED ENV{TENSORFLOW_DIR} )
   # find tensorflow library
   find_ups_product( protobuf )
   find_ups_product( tensorflow )
-  find_ups_product(trtis_clients)
   cet_find_library(TENSORFLOW NAMES tensorflow-core PATHS ENV TENSORFLOW_LIB NO_DEFAULT_PATH )
   cet_find_library(PROTOBUF NAMES protobuf PATHS ENV PROTOBUF_LIB NO_DEFAULT_PATH )
   # This is a hack for a broken tensorflow link, which
@@ -75,6 +72,9 @@ if(( DEFINED ENV{TENSORFLOW_DIR} ) AND ( DEFINED ENV{TRTIS_CLIENTS_DIR} ))
   if ( "${OSTYPE}" MATCHES "slf6" )
     set(FOR_TENSORFLOW "-lrt")
   endif ()
+endif ()
+if( DEFINED ENV{TRTIS_CLIENTS_DIR} )
+  find_ups_product(trtis_clients)
 endif ()
 
 # source
