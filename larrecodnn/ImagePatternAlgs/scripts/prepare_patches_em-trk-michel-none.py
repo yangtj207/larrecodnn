@@ -119,9 +119,9 @@ def main(argv):
                     is_raw_zero = (raw[i,j] < 0.01)
                     is_michel = (pdg[i,j] & 0xF000 == 0x2000) # has michel flag set, wont skip it
                     is_muon = (pdg[i,j] & 0xFFF == 13)
-                
+
                     is_vtx = (vtx_map[i,j] > 0)
-                
+
                     x_start = np.max([0, i - PATCH_SIZE_W/2])
                     x_stop  = np.min([raw.shape[0], x_start + PATCH_SIZE_W])
 
@@ -137,7 +137,7 @@ def main(argv):
                         if np.count_nonzero(pdg_patch) > 2:
                             is_mu_near_stop = True
                             sel_mu_near_stop += 1
-                
+
                     vtx_patch = vtx_map[x_start+2:x_stop-2, y_start+2:y_stop-2]
                     near_vtx_count = np.count_nonzero(vtx_patch)
 
