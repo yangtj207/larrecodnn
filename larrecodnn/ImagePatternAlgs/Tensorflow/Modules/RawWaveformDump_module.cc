@@ -98,6 +98,7 @@ private:
   double fMinEnergyDepositedMeV;
   int fMinNumberOfElectrons;
   int fMaxNumberOfElectrons;
+  bool fSaveSignal;
   art::ServiceHandle<geo::Geometry> fgeom;
   art::ServiceHandle<cheat::ParticleInventoryService> PIS;
   //art::ServiceHandle<SimChannelExtractService> m_pscx;
@@ -110,31 +111,31 @@ private:
 
 //-----------------------------------------------------------------------
 struct genFinder{
-  private:
-    typedef std::pair<int, std::string> track_id_to_string;
-    std::vector<track_id_to_string> track_id_map;
-    std::set<std::string> generator_names;
-    bool isSorted=false;
+private:
+  typedef std::pair<int, std::string> track_id_to_string;
+  std::vector<track_id_to_string> track_id_map;
+  std::set<std::string> generator_names;
+  bool isSorted=false;
 
-  public:
-    void sort_now(){
-      std::sort(this->track_id_map.begin(), this->track_id_map.end(), [](const auto &a, const auto &b){return (a.first < b.first) ; } );
-      isSorted=true;
+public:
+  void sort_now(){
+    std::sort(this->track_id_map.begin(), this->track_id_map.end(), [](const auto &a, const auto &b){return (a.first < b.first) ; } );
+    isSorted=true;
+  }
+  void add(const int& track_id, const std::string& gname){
+    this->track_id_map.push_back(std::make_pair(track_id, gname));
+    generator_names.emplace(gname);
+    isSorted=false;
+  }
+  bool has_gen(std::string gname){
+    return static_cast<bool>(generator_names.count(gname));
+  };
+  std::string get_gen(int tid){
+    if( !isSorted ){
+      this->sort_now();
     }
-    void add(const int& track_id, const std::string& gname){
-      this->track_id_map.push_back(std::make_pair(track_id, gname));
-      generator_names.emplace(gname);
-      isSorted=false;
-    }
-    bool has_gen(std::string gname){
-      return static_cast<bool>(generator_names.count(gname));
-    };
-    std::string get_gen(int tid){
-      if( !isSorted ){
-	this->sort_now();
-      }
-      return std::lower_bound(track_id_map.begin(), track_id_map.end(), tid,[](const auto &a, const auto &b){return (a.first < b) ; } )->second;
-    };
+    return std::lower_bound(track_id_map.begin(), track_id_map.end(), tid,[](const auto &a, const auto &b){return (a.first < b) ; } )->second;
+  };
 
 };
 genFinder* gf = new genFinder();
@@ -143,9 +144,9 @@ genFinder* gf = new genFinder();
 nnet::RawWaveformDump::RawWaveformDump(fhicl::ParameterSet const& p)
   : EDAnalyzer{p},
   fClks(lar::providerFrom<detinfo::DetectorClocksService>())
-{
-  this->reconfigure(p);
-}
+  {
+    this->reconfigure(p);
+  }
 
 //-----------------------------------------------------------------------
 void nnet::RawWaveformDump::reconfigure(fhicl::ParameterSet const & p)
@@ -167,6 +168,8 @@ void nnet::RawWaveformDump::reconfigure(fhicl::ParameterSet const & p)
   fMinNumberOfElectrons = p.get<int>("MinNumberOfElectrons",1000);
   fMaxNumberOfElectrons = p.get<int>("MaxNumberOfElectrons",100000);
 
+  fSaveSignal = p.get<bool>("SaveSignal", true);
+
   return;
 }
 
@@ -174,64 +177,64 @@ void nnet::RawWaveformDump::reconfigure(fhicl::ParameterSet const & p)
 void nnet::RawWaveformDump::beginJob()
 {
 
-    auto const* detprop = lar::providerFrom<detinfo::DetectorPropertiesService>();
+  auto const* detprop = lar::providerFrom<detinfo::DetectorPropertiesService>();
 
-    std::random_device rndm_device;	// this will give us our seed
-    rndm_engine.seed(rndm_device());
+  std::random_device rndm_device;	// this will give us our seed
+  rndm_engine.seed(rndm_device());
 
-    c2numpy_init(&npywriter, fDumpWaveformsFileName, 50000);
-    c2numpy_addcolumn(&npywriter, "evt",   C2NUMPY_UINT32);
-    c2numpy_addcolumn(&npywriter, "chan",  C2NUMPY_UINT32);
-    c2numpy_addcolumn(&npywriter, "view",  (c2numpy_type)((int)C2NUMPY_STRING + 1) );
-    c2numpy_addcolumn(&npywriter, "ntrk",  C2NUMPY_UINT16);
+  c2numpy_init(&npywriter, fDumpWaveformsFileName, 50000);
+  c2numpy_addcolumn(&npywriter, "evt",   C2NUMPY_UINT32);
+  c2numpy_addcolumn(&npywriter, "chan",  C2NUMPY_UINT32);
+  c2numpy_addcolumn(&npywriter, "view",  (c2numpy_type)((int)C2NUMPY_STRING + 1) );
+  c2numpy_addcolumn(&npywriter, "ntrk",  C2NUMPY_UINT16);
 
-    for(unsigned int i=0; i<5; i++){
-      std::ostringstream name;
+  for(unsigned int i=0; i<5; i++){
+    std::ostringstream name;
 
-      name.str("");
-      name << "tid" << i;
-      c2numpy_addcolumn(&npywriter, name.str().c_str(), C2NUMPY_INT32);
+    name.str("");
+    name << "tid" << i;
+    c2numpy_addcolumn(&npywriter, name.str().c_str(), C2NUMPY_INT32);
 
-      name.str("");
-      name << "pdg" << i;
-      c2numpy_addcolumn(&npywriter, name.str().c_str(), C2NUMPY_INT32);
+    name.str("");
+    name << "pdg" << i;
+    c2numpy_addcolumn(&npywriter, name.str().c_str(), C2NUMPY_INT32);
 
-      name.str("");
-      name << "gen" << i;
-      c2numpy_addcolumn(&npywriter, name.str().c_str(), (c2numpy_type)((int)C2NUMPY_STRING + 6));
+    name.str("");
+    name << "gen" << i;
+    c2numpy_addcolumn(&npywriter, name.str().c_str(), (c2numpy_type)((int)C2NUMPY_STRING + 6));
 
-      name.str("");
-      name << "pid" << i;
-      c2numpy_addcolumn(&npywriter, name.str().c_str(), (c2numpy_type)((int)C2NUMPY_STRING + 7));
+    name.str("");
+    name << "pid" << i;
+    c2numpy_addcolumn(&npywriter, name.str().c_str(), (c2numpy_type)((int)C2NUMPY_STRING + 7));
 
-      name.str("");
-      name << "edp" << i;
-      c2numpy_addcolumn(&npywriter, name.str().c_str(), C2NUMPY_FLOAT32);
+    name.str("");
+    name << "edp" << i;
+    c2numpy_addcolumn(&npywriter, name.str().c_str(), C2NUMPY_FLOAT32);
 
-      name.str("");
-      name << "nel" << i;
-      c2numpy_addcolumn(&npywriter, name.str().c_str(), C2NUMPY_UINT32);
+    name.str("");
+    name << "nel" << i;
+    c2numpy_addcolumn(&npywriter, name.str().c_str(), C2NUMPY_UINT32);
 
-      name.str("");
-      name << "sti" << i;
-      c2numpy_addcolumn(&npywriter, name.str().c_str(), C2NUMPY_UINT16);
+    name.str("");
+    name << "sti" << i;
+    c2numpy_addcolumn(&npywriter, name.str().c_str(), C2NUMPY_UINT16);
 
-      name.str("");
-      name << "stf" << i;
-      c2numpy_addcolumn(&npywriter, name.str().c_str(), C2NUMPY_UINT16);
-    }
+    name.str("");
+    name << "stf" << i;
+    c2numpy_addcolumn(&npywriter, name.str().c_str(), C2NUMPY_UINT16);
+  }
 
-    for(unsigned int i=0; i<detprop->ReadOutWindowSize(); i++){
-      std::ostringstream name;
-      name << "tck_" << i;
-      c2numpy_addcolumn(&npywriter, name.str().c_str(), C2NUMPY_INT16);
-    }
+  for(unsigned int i=0; i<detprop->ReadOutWindowSize(); i++){
+    std::ostringstream name;
+    name << "tck_" << i;
+    c2numpy_addcolumn(&npywriter, name.str().c_str(), C2NUMPY_INT16);
+  }
 }
 
 //-----------------------------------------------------------------------
 void nnet::RawWaveformDump::endJob()
 {
-    c2numpy_close(&npywriter);
+  c2numpy_close(&npywriter);
 }
 
 //-----------------------------------------------------------------------
@@ -302,156 +305,195 @@ void nnet::RawWaveformDump::analyze(art::Event const& evt)
   std::string dummystr6="none  ";
   std::string dummystr7="none   ";
 
-  // .. create a channel number to trackid-wire signal info map
-  std::map<raw::ChannelID_t,std::map<int,WireSigInfo>>Ch2TrkWSInfoMap;
+  if (fSaveSignal){
+    // .. create a channel number to trackid-wire signal info map
+    std::map<raw::ChannelID_t,std::map<int,WireSigInfo>>Ch2TrkWSInfoMap;
 
-  // .. create a track ID to vector of channel numbers (in w/c this track deposited energy) map
-  std::map<int,std::vector<raw::ChannelID_t>>Trk2ChVecMap;
+    // .. create a track ID to vector of channel numbers (in w/c this track deposited energy) map
+    std::map<int,std::vector<raw::ChannelID_t>>Trk2ChVecMap;
 
-  // ... Loop over simChannels
-  for ( auto const& channel : (*simChannelHandle) ){
+    // ... Loop over simChannels
+    for ( auto const& channel : (*simChannelHandle) ){
 
-    // .. get simChannel channel number
-    const raw::ChannelID_t ch1 = channel.Channel();
-    if(ch1==raw::InvalidChannelID)continue;
-    if(geo::PlaneGeo::ViewName(fgeom->View(ch1))!=fPlaneToDump[0])continue;
+      // .. get simChannel channel number
+      const raw::ChannelID_t ch1 = channel.Channel();
+      if(ch1==raw::InvalidChannelID)continue;
+      if(geo::PlaneGeo::ViewName(fgeom->View(ch1))!=fPlaneToDump[0])continue;
 
-    bool selectThisChannel=false;
+      bool selectThisChannel=false;
 
-    // .. create a track ID to wire signal info map
-    std::map<int,WireSigInfo>Trk2WSInfoMap;
+      // .. create a track ID to wire signal info map
+      std::map<int,WireSigInfo>Trk2WSInfoMap;
 
-    // ... Loop over all ticks with ionization energy deposited
-    auto const& timeSlices = channel.TDCIDEMap();
-    for ( auto const& timeSlice : timeSlices ){
+      // ... Loop over all ticks with ionization energy deposited
+      auto const& timeSlices = channel.TDCIDEMap();
+      for ( auto const& timeSlice : timeSlices ){
 
-      auto const& energyDeposits = timeSlice.second;
-      auto const tpctime = timeSlice.first;
-      unsigned int tdctick = static_cast<unsigned int>(fClks->TPCTDC2Tick(double(tpctime)));
-      if(tdctick!=tpctime)std::cout << "tpctime: " << tpctime << ", tdctick: " << tdctick << std::endl;
-      if(tdctick<0||tdctick>(dataSize-1))continue;
+        auto const& energyDeposits = timeSlice.second;
+        auto const tpctime = timeSlice.first;
+        unsigned int tdctick = static_cast<unsigned int>(fClks->TPCTDC2Tick(double(tpctime)));
+        if(tdctick!=tpctime)std::cout << "tpctime: " << tpctime << ", tdctick: " << tdctick << std::endl;
+        if(tdctick<0||tdctick>(dataSize-1))continue;
 
-      // ... Loop over all energy depositions in this tick
-      for ( auto const& energyDeposit : energyDeposits ){
+        // ... Loop over all energy depositions in this tick
+        for ( auto const& energyDeposit : energyDeposits ){
 
-        if (!energyDeposit.trackID) continue;
-        int trkid = energyDeposit.trackID;
-        simb::MCParticle particle = PIS->TrackIdToMotherParticle(trkid);
-	//std::cout << energyDeposit.trackID << " " << trkid << " " << particle.TrackId() << std::endl;
+          if (!energyDeposit.trackID) continue;
+          int trkid = energyDeposit.trackID;
+          simb::MCParticle particle = PIS->TrackIdToMotherParticle(trkid);
+          //std::cout << energyDeposit.trackID << " " << trkid << " " << particle.TrackId() << std::endl;
 
-        // .. ignore this energy deposition if incident particle energy below some threshold
-        if ( particle.E() < fMinParticleEnergyGeV ) continue;
+          // .. ignore this energy deposition if incident particle energy below some threshold
+          if ( particle.E() < fMinParticleEnergyGeV ) continue;
 
-        int eve_id = PIS->TrackIdToEveTrackId(trkid);
-        if (!eve_id) continue;
-        std::string genlab = gf->get_gen(eve_id);
+          int eve_id = PIS->TrackIdToEveTrackId(trkid);
+          if (!eve_id) continue;
+          std::string genlab = gf->get_gen(eve_id);
 
-        if (Trk2WSInfoMap.find(trkid) == Trk2WSInfoMap.end()){
-          WireSigInfo wsinf;
-          wsinf.pdgcode = particle.PdgCode();
-          wsinf.genlab = genlab;
-          wsinf.procid = particle.Process();
-          wsinf.tdcmin=dataSize-1;
-          wsinf.tdcmax=0;
-          wsinf.edep=0.;
-          wsinf.numel=0;
-          Trk2WSInfoMap.insert(std::pair<int,WireSigInfo>(trkid,wsinf));
+          if (Trk2WSInfoMap.find(trkid) == Trk2WSInfoMap.end()){
+            WireSigInfo wsinf;
+            wsinf.pdgcode = particle.PdgCode();
+            wsinf.genlab = genlab;
+            wsinf.procid = particle.Process();
+            wsinf.tdcmin=dataSize-1;
+            wsinf.tdcmax=0;
+            wsinf.edep=0.;
+            wsinf.numel=0;
+            Trk2WSInfoMap.insert(std::pair<int,WireSigInfo>(trkid,wsinf));
+          }
+          if (tdctick<Trk2WSInfoMap.at(trkid).tdcmin)Trk2WSInfoMap.at(trkid).tdcmin=tdctick;
+          if (tdctick>Trk2WSInfoMap.at(trkid).tdcmax)Trk2WSInfoMap.at(trkid).tdcmax=tdctick;
+          Trk2WSInfoMap.at(trkid).edep +=energyDeposit.energy;
+          Trk2WSInfoMap.at(trkid).numel+=energyDeposit.numElectrons;
         }
-        if (tdctick<Trk2WSInfoMap.at(trkid).tdcmin)Trk2WSInfoMap.at(trkid).tdcmin=tdctick;
-        if (tdctick>Trk2WSInfoMap.at(trkid).tdcmax)Trk2WSInfoMap.at(trkid).tdcmax=tdctick;
-        Trk2WSInfoMap.at(trkid).edep +=energyDeposit.energy;
-        Trk2WSInfoMap.at(trkid).numel+=energyDeposit.numElectrons;
       }
-    }
 
-    if(!Trk2WSInfoMap.empty()){
-      for(std::pair<int,WireSigInfo> itmap : Trk2WSInfoMap){
-        if (fSelectGenLabel!="ANY"){
-          if(itmap.second.genlab!=fSelectGenLabel)continue;
-        }
-        if (fSelectProcID!="ANY"){
-          if(itmap.second.procid!=fSelectProcID)continue;
-        }
-        if (fSelectPDGCode!=0){
-          if(itmap.second.pdgcode!=fSelectPDGCode)continue;
-        }
-        itmap.second.genlab.resize(6,' ');
-        itmap.second.procid.resize(7,' ');
-        if(itmap.second.numel>=fMinNumberOfElectrons && itmap.second.edep>=fMinEnergyDepositedMeV){
-          if(fMaxNumberOfElectrons>=0 && itmap.second.numel>=fMaxNumberOfElectrons){
-            continue;
-          } else {
-            int trkid = itmap.first;
-            if (Trk2ChVecMap.find(trkid) == Trk2ChVecMap.end()){
-              std::vector<raw::ChannelID_t>chvec;
-              Trk2ChVecMap.insert(std::pair<int,std::vector<raw::ChannelID_t>>(trkid,chvec));
+      if(!Trk2WSInfoMap.empty()){
+        for(std::pair<int,WireSigInfo> itmap : Trk2WSInfoMap){
+          if (fSelectGenLabel!="ANY"){
+            if(itmap.second.genlab!=fSelectGenLabel)continue;
+          }
+          if (fSelectProcID!="ANY"){
+            if(itmap.second.procid!=fSelectProcID)continue;
+          }
+          if (fSelectPDGCode!=0){
+            if(itmap.second.pdgcode!=fSelectPDGCode)continue;
+          }
+          itmap.second.genlab.resize(6,' ');
+          itmap.second.procid.resize(7,' ');
+          if(itmap.second.numel>=fMinNumberOfElectrons && itmap.second.edep>=fMinEnergyDepositedMeV){
+            if(fMaxNumberOfElectrons>=0 && itmap.second.numel>=fMaxNumberOfElectrons){
+              continue;
+            } else {
+              int trkid = itmap.first;
+              if (Trk2ChVecMap.find(trkid) == Trk2ChVecMap.end()){
+                std::vector<raw::ChannelID_t>chvec;
+                Trk2ChVecMap.insert(std::pair<int,std::vector<raw::ChannelID_t>>(trkid,chvec));
+              }
+              Trk2ChVecMap.at(trkid).push_back(ch1);
+              selectThisChannel=true;
             }
-            Trk2ChVecMap.at(trkid).push_back(ch1);
-            selectThisChannel=true;
+          }
+        } // loop over Trk2WSinfoMap
+        if(selectThisChannel){
+          Ch2TrkWSInfoMap.insert(std::pair<raw::ChannelID_t,std::map<int,WireSigInfo>>(ch1,Trk2WSInfoMap));
+        }
+      } // if Trk2WSInfoMap not empty
+
+    } // loop over SimChannels
+
+    // ... Now write out the signal waveforms for each track
+    if(!Trk2ChVecMap.empty()){
+      for(auto const& ittrk : Trk2ChVecMap){
+        std::uniform_int_distribution<int> rndm_dist(0,ittrk.second.size()-1);
+        int i = rndm_dist(rndm_engine); // randomly select one channel with a signal from this particle
+        chnum=ittrk.second[i];
+
+        std::map<raw::ChannelID_t,std::map<int,WireSigInfo>>::iterator itchn;
+        itchn = Ch2TrkWSInfoMap.find(chnum);
+        if( itchn != Ch2TrkWSInfoMap.end() ){
+          auto search = rawdigitMap.find(chnum);
+          if ( search == rawdigitMap.end() ) continue;
+          art::Ptr<raw::RawDigit> rawdig = (*search).second;
+          raw::Uncompress(rawdig->ADCs(), rawadc, rawdig->GetPedestal(), rawdig->Compression());
+
+          c2numpy_uint32(&npywriter, evt.id().event());
+          c2numpy_uint32(&npywriter, chnum);
+          c2numpy_string(&npywriter, geo::PlaneGeo::ViewName(fgeom->View(chnum)).c_str());
+          c2numpy_uint16(&npywriter, itchn->second.size());  // size of Trk2WSInfoMap, or number of peaks
+
+          // .. write out info for each peak
+          unsigned int icnt=0;
+          for ( auto const& it : itchn->second ){
+            c2numpy_int32(&npywriter,   it.first);                 // trackid
+            c2numpy_int32(&npywriter,   it.second.pdgcode);        // pdgcode
+            c2numpy_string(&npywriter,  it.second.genlab.c_str()); // genlab
+            c2numpy_string(&npywriter,  it.second.procid.c_str()); // procid
+            c2numpy_float32(&npywriter, it.second.edep);           // edepo
+            c2numpy_uint32(&npywriter,  it.second.numel);          // numelec
+            c2numpy_uint16(&npywriter,  it.second.tdcmin);         // stck1
+            c2numpy_uint16(&npywriter,  it.second.tdcmax);         // stc2
+            icnt++;
+            if(icnt==5)break;
+          }
+
+          // .. pad with 0's if number of peaks less than 5
+          for ( unsigned int i=icnt; i<5; ++i){
+            c2numpy_int32(&npywriter, 0);
+            c2numpy_int32(&npywriter, 0);
+            c2numpy_string(&npywriter, dummystr6.c_str());
+            c2numpy_string(&npywriter, dummystr7.c_str());
+            c2numpy_float32(&npywriter, 0.);
+            c2numpy_uint32(&npywriter, 0);
+            c2numpy_uint16(&npywriter, 0);
+            c2numpy_uint16(&npywriter, 0);
+          }
+
+          // .. now write out the ADC values
+          for ( unsigned int itck=0; itck<dataSize; ++itck ){
+            rawadc[itck] -= rawdig->GetPedestal();
+            c2numpy_int16(&npywriter, rawadc[itck]);
           }
         }
-      } // loop over Trk2WSinfoMap
-      if(selectThisChannel){
-        Ch2TrkWSInfoMap.insert(std::pair<raw::ChannelID_t,std::map<int,WireSigInfo>>(ch1,Trk2WSInfoMap));
-      }
-    } // if Trk2WSInfoMap not empty
-
-  } // loop over SimChannels
-
-  // ... Now write out the signal waveforms for each track
-  if(!Trk2ChVecMap.empty()){
-    for(auto const& ittrk : Trk2ChVecMap){
-      std::uniform_int_distribution<int> rndm_dist(0,ittrk.second.size()-1);
-      int i = rndm_dist(rndm_engine); // randomly select one channel with a signal from this particle
-      chnum=ittrk.second[i];
-
-      std::map<raw::ChannelID_t,std::map<int,WireSigInfo>>::iterator itchn;
-      itchn = Ch2TrkWSInfoMap.find(chnum);
-      if( itchn != Ch2TrkWSInfoMap.end() ){
-        auto search = rawdigitMap.find(chnum);
-        if ( search == rawdigitMap.end() ) continue;
-        art::Ptr<raw::RawDigit> rawdig = (*search).second;
-        raw::Uncompress(rawdig->ADCs(), rawadc, rawdig->GetPedestal(), rawdig->Compression());
-
-        c2numpy_uint32(&npywriter, evt.id().event());
-        c2numpy_uint32(&npywriter, chnum);
-        c2numpy_string(&npywriter, geo::PlaneGeo::ViewName(fgeom->View(chnum)).c_str());
-        c2numpy_uint16(&npywriter, itchn->second.size());  // size of Trk2WSInfoMap, or number of peaks
-
-        // .. write out info for each peak
-        unsigned int icnt=0;
-        for ( auto const& it : itchn->second ){
-          c2numpy_int32(&npywriter,   it.first);                 // trackid
-          c2numpy_int32(&npywriter,   it.second.pdgcode);        // pdgcode
-          c2numpy_string(&npywriter,  it.second.genlab.c_str()); // genlab
-          c2numpy_string(&npywriter,  it.second.procid.c_str()); // procid
-          c2numpy_float32(&npywriter, it.second.edep);           // edepo
-          c2numpy_uint32(&npywriter,  it.second.numel);          // numelec
-          c2numpy_uint16(&npywriter,  it.second.tdcmin);         // stck1
-          c2numpy_uint16(&npywriter,  it.second.tdcmax);         // stc2
-          icnt++;
-          if(icnt==5)break;
-        }
-
-        // .. pad with 0's if number of peaks less than 5
-        for ( unsigned int i=icnt; i<5; ++i){
-          c2numpy_int32(&npywriter, 0);
-          c2numpy_int32(&npywriter, 0);
-          c2numpy_string(&npywriter, dummystr6.c_str());
-          c2numpy_string(&npywriter, dummystr7.c_str());
-          c2numpy_float32(&npywriter, 0.);
-          c2numpy_uint32(&npywriter, 0);
-          c2numpy_uint16(&npywriter, 0);
-          c2numpy_uint16(&npywriter, 0);
-        }
-
-        // .. now write out the ADC values
-        for ( unsigned int itck=0; itck<dataSize; ++itck ){
-          rawadc[itck] -= rawdig->GetPedestal();
-          c2numpy_int16(&npywriter, rawadc[itck]);
-        }
       }
     }
+  }
+  else{
+    //save noise
+    int noisechancount=0;
+    std::map< raw::ChannelID_t, bool > signalMap;
+    for ( auto const& channel : (*simChannelHandle) ){
+      signalMap[channel.Channel()] = true;
+    }
+
+    std::vector<short> rawadc(dataSize);  // vector to hold uncompressed adc values later
+
+    for ( size_t rdIter = 0; rdIter < digitVecHandle->size(); ++rdIter ) {
+      art::Ptr<raw::RawDigit> digitVec(digitVecHandle, rdIter);
+      if (signalMap[digitVec->Channel()]) continue;
+      if(geo::PlaneGeo::ViewName(fgeom->View(digitVec->Channel()))!=fPlaneToDump[0]) continue;
+      raw::Uncompress(digitVec->ADCs(), rawadc, digitVec->GetPedestal(), digitVec->Compression());
+      c2numpy_uint32(&npywriter, evt.id().event());
+      c2numpy_uint32(&npywriter, digitVec->Channel());
+      c2numpy_string(&npywriter, geo::PlaneGeo::ViewName(fgeom->View(digitVec->Channel())).c_str());
+      c2numpy_uint16(&npywriter, 0); //number of peaks
+      for ( unsigned int i=0; i<5; ++i){
+        c2numpy_int32(&npywriter, 0);
+        c2numpy_int32(&npywriter, 0);
+        c2numpy_string(&npywriter, dummystr6.c_str());
+        c2numpy_string(&npywriter, dummystr7.c_str());
+        c2numpy_float32(&npywriter, 0.);
+        c2numpy_uint32(&npywriter, 0);
+        c2numpy_uint16(&npywriter, 0);
+        c2numpy_uint16(&npywriter, 0);
+      }
+      for ( unsigned int itck=0; itck<dataSize; ++itck ){
+        rawadc[itck] -= digitVec->GetPedestal();
+        c2numpy_int16(&npywriter, rawadc[itck]);
+      }
+      ++noisechancount;
+    }
+    std::cout<<"Total number of noise channels "<<noisechancount<<std::endl;
   }
 
 }
