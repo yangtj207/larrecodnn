@@ -78,7 +78,7 @@ public:
   // Required functions.
   void analyze(art::Event const& e) override;
 
-  void reconfigure(fhicl::ParameterSet const & p);
+  //void reconfigure(fhicl::ParameterSet const & p);
 
   void beginJob() override;
   void endJob() override;
@@ -143,35 +143,25 @@ genFinder* gf = new genFinder();
 //-----------------------------------------------------------------------
 nnet::RawWaveformDump::RawWaveformDump(fhicl::ParameterSet const& p)
   : EDAnalyzer{p},
+  fDumpWaveformsFileName(p.get<std::string>("DumpWaveformsFileName","dumpwaveforms")),
+  fSimulationProducerLabel(p.get<std::string>("SimulationProducerLabel", "largeant")),
+  fDigitModuleLabel(p.get<std::string>("DigitModuleLabel", "daq")),
+  fSelectGenLabel(p.get<std::string>("SelectGenLabel","ANY")),
+  fSelectProcID(p.get<std::string>("SelectProcID",  "ANY")),
+  fSelectPDGCode(p.get<int>("SelectPDGCode", 0)),
+  fPlaneToDump(p.get<std::string>("PlaneToDump", "U")),
+  fMinParticleEnergyGeV(p.get<double>("MinParticleEnergyGeV",0.)),
+  fMinEnergyDepositedMeV(p.get<double>("MinEnergyDepositedMeV",0.)),
+  fMinNumberOfElectrons(p.get<int>("MinNumberOfElectrons",1000)),
+  fMaxNumberOfElectrons(p.get<int>("MaxNumberOfElectrons",100000)),
+  fSaveSignal(p.get<bool>("SaveSignal", true)),
   fClks(lar::providerFrom<detinfo::DetectorClocksService>())
   {
-    this->reconfigure(p);
+    if (std::getenv("PROCESS")){
+      fDumpWaveformsFileName += string(std::getenv("PROCESS"))+"-";
+    }
+    //this->reconfigure(p);
   }
-
-//-----------------------------------------------------------------------
-void nnet::RawWaveformDump::reconfigure(fhicl::ParameterSet const & p)
-{
-  fDumpWaveformsFileName = p.get<std::string>("DumpWaveformsFileName","dumpwaveforms");
-  if (std::getenv("PROCESS")){
-    fDumpWaveformsFileName += string(std::getenv("PROCESS"))+"-";
-  }
-  fSimulationProducerLabel = p.get<std::string>("SimulationProducerLabel", "largeant");
-  fDigitModuleLabel = p.get<std::string>("DigitModuleLabel", "daq");
-
-  fSelectGenLabel = p.get<std::string>("SelectGenLabel","ANY");
-  fSelectProcID   = p.get<std::string>("SelectProcID",  "ANY");
-  fSelectPDGCode  = p.get<int>("SelectPDGCode", 0);
-
-  fPlaneToDump = p.get<std::string>("PlaneToDump", "U");
-  fMinParticleEnergyGeV = p.get<double>("MinParticleEnergyGeV",0.);
-  fMinEnergyDepositedMeV = p.get<double>("MinEnergyDepositedMeV",0.);
-  fMinNumberOfElectrons = p.get<int>("MinNumberOfElectrons",1000);
-  fMaxNumberOfElectrons = p.get<int>("MaxNumberOfElectrons",100000);
-
-  fSaveSignal = p.get<bool>("SaveSignal", true);
-
-  return;
-}
 
 //-----------------------------------------------------------------------
 void nnet::RawWaveformDump::beginJob()
