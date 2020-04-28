@@ -145,7 +145,7 @@ def get_patch(a, wire, drift, wsize, dsize):
                     patch[wpatch,dpatch] = a[w,d];
                 dpatch += 1
         wpatch += 1
-    
+
     return patch
 
 def get_vertices(A):
