@@ -138,7 +138,7 @@ public:
   };
 
 };
-genFinder* gf = new genFinder();
+std::unique_ptr<genFinder> gf(new genFinder());
 
 //-----------------------------------------------------------------------
 nnet::RawWaveformDump::RawWaveformDump(fhicl::ParameterSet const& p)
