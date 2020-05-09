@@ -193,12 +193,12 @@ void nnet::WaveformRoiFinder::produce(art::Event& e)
       for (size_t itck = 0; itck < rawadc.size(); ++itck){
         inputsignal[itck] = rawadc[itck] - digitVec->GetPedestal();
         //std::cout<<rawadc[itck]<<" "<<digitVec->GetPedestal()<<std::endl;
-        if (geo->View(rawlist[ich]->Channel()) == 2){
-          inputsignal[itck] -= 900;
-        }
-        else{
-          inputsignal[itck] -= 2350;
-        }
+//        if (geo->View(rawlist[ich]->Channel()) == 2){
+//          inputsignal[itck] -= 900;
+//        }
+//        else{
+//          inputsignal[itck] -= 2350;
+//        }
         adc[itck] = (inputsignal[itck] - meanvec[itck])/scalevec[itck];
       }
     }
