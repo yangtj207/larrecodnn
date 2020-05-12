@@ -11,8 +11,6 @@
 #include "art/Framework/Core/ModuleMacros.h"
 #include "art/Framework/Principal/Event.h"
 #include "art/Framework/Principal/Handle.h"
-#include "art/Framework/Principal/Run.h"
-#include "art/Framework/Principal/SubRun.h"
 #include "art_root_io/TFileService.h"
 #include "canvas/Utilities/InputTag.h"
 #include "fhiclcpp/ParameterSet.h"
@@ -51,8 +49,8 @@ public:
 
 private:
 
-  void beginJob();
-  void endJob();
+  void beginJob() override;
+  void endJob() override;
   // Declare member data here.
   TH1D *h_energy[3];
   TH1D *h_energy_roi[3];
@@ -93,7 +91,7 @@ void nnet::EvaluateROIEff::analyze(art::Event const& e)
     // .. get simChannel channel number
     const raw::ChannelID_t ch1 = channel.Channel();
     if (chStatus.IsBad(ch1)) continue;
-    if (ch1%1000 == 0) std::cout<<ch1<<std::endl;
+    if (ch1%1000 == 0) mf::LogInfo("EvaluateROIEFF")<<ch1;
     int view = geo->View(ch1);
     auto const& timeSlices = channel.TDCIDEMap();
     for ( auto const& timeSlice : timeSlices ){
