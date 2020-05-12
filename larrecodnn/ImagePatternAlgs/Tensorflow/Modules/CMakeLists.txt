@@ -4,6 +4,7 @@ art_make( MODULE_LIBRARIES
 		lardataobj_RecoBase
 		lardata_ArtDataHelper
 		larreco_Calorimetry
+                lardataobj_RawData
 		larrecodnn_ImagePatternAlgs_Tensorflow_PointIdAlg
 		nusimdata_SimulationBase
 		${ART_FRAMEWORK_CORE}
@@ -16,6 +17,7 @@ art_make( MODULE_LIBRARIES
 		art_Persistency_Provenance
 		art_Utilities
 		canvas
+                larsim_MCCheater_ParticleInventoryService_service
 		${MF_MESSAGELOGGER}
 		cetlib cetlib_except
 		${ROOT_BASIC_LIB_LIST}
