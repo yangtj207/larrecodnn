@@ -5,6 +5,7 @@ art_make(LIB_LIBRARIES larreco_RecoAlg_ImagePatternAlgs_DataProvider
                        larrecodnn_ImagePatternAlgs_Tensorflow_TF
                        larcore_Geometry_Geometry_service
                        larcorealg_Geometry
+                       lardataalg_DetectorInfo
                        lardataobj_RecoBase
                        larreco_Calorimetry
                        nusimdata_SimulationBase
