@@ -1,4 +1,6 @@
-art_make( MODULE_LIBRARIES
+art_make(
+
+MODULE_LIBRARIES
                 larcore_Geometry_Geometry_service
 		larcorealg_Geometry
 		lardataobj_RecoBase
