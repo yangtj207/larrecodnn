@@ -33,12 +33,12 @@ namespace wavrec_tool
           int j1;
 	  for (unsigned int i=0; i<fNumStrides; i++){
             j1 = i*fStrideLength;
-            if(predv[i][0]>0.5){
+            if(predv[i][0]>fCnnPredCut){
               std::fill_n(bvec.begin()+j1,fWindowSize,true);
             }
           }
           // .. last window is a special case
-          if(predv[fNumStrides][0]>0.5){
+          if(predv[fNumStrides][0]>fCnnPredCut){
             j1 = fNumStrides*fStrideLength;
             std::fill_n(bvec.begin()+j1,fLastWindowSize,true);
           }
@@ -72,8 +72,9 @@ namespace wavrec_tool
         }
 
     protected:
-        float fCnnInputMean;
-        float fCnnInputScale;
+        std::vector<float>scalevec;
+        std::vector<float>meanvec;
+	float fCnnPredCut;
         unsigned int fWaveformSize;	    // Full waveform size
         unsigned int fWindowSize;	    // Scan window size
         unsigned int fStrideLength;	    // Offset (in #time ticks) between scan windows
@@ -102,7 +103,7 @@ namespace wavrec_tool
           // .. rescale input waveform for CNN
           std::vector<float>adc(fWaveformSize);
           for (size_t itck = 0; itck < fWaveformSize; ++itck){
-            adc[itck] = (adcin[itck] - fCnnInputMean)/fCnnInputScale;
+            adc[itck] = (adcin[itck] - meanvec[itck])/scalevec[itck];
           }
 
           // .. create a vector of windows

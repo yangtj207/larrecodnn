@@ -57,9 +57,36 @@ namespace wavrec_tool
 
     mf::LogInfo("WaveformRecogTrtis") << "tensorRT inference context created.";
 
-    fCnnInputMean=pset.get<float>("CnnInputMean",0.);
-    fCnnInputScale=pset.get<float>("CnnInputScale",1.);
+    fCnnPredCut=pset.get<float>("CnnPredCut", 0.5);
     fWaveformSize=pset.get<unsigned int>("WaveformSize", 0); // 6000
+    std::string fMeanFilename=pset.get< std::string >("MeanFilename","");
+    std::string fScaleFilename=pset.get< std::string >("ScaleFilename","");
+
+    // ... load the mean and scale (std) vectors
+    if(!fMeanFilename.empty() && !fScaleFilename.empty()){
+      float val;
+      std::ifstream meanfile(findFile(fMeanFilename.c_str()).c_str());
+      if (meanfile.is_open()){
+        while(meanfile >> val)meanvec.push_back(val);
+        meanfile.close();
+        if (meanvec.size()!=fWaveformSize){
+          throw cet::exception("WaveformRecogTrtis_tool") << "vector of mean values does not match waveform size, exiting" << std::endl;
+        }
+      } else {
+        throw cet::exception("WaveformRecogTrtis_tool") << "failed opening StdScaler mean file, exiting" << std::endl;
+      }
+      std::ifstream scalefile(findFile(fScaleFilename.c_str()).c_str());
+      if (scalefile.is_open()){
+        while(scalefile >> val)scalevec.push_back(val);
+        scalefile.close();
+        if (scalevec.size()!=fWaveformSize){
+          throw cet::exception("WaveformRecogTrtis_tool") << "vector of scale values does not match waveform size, exiting" << std::endl;
+        }
+      } else {
+        throw cet::exception("WaveformRecogTrtis_tool") << "failed opening StdScaler scale file, exiting" << std::endl;
+      }
+    }
+
     fWindowSize=pset.get<unsigned int>("ScanWindowSize", 0); // 200
     fStrideLength=pset.get<unsigned int>("StrideLength", 0); // 150
 
