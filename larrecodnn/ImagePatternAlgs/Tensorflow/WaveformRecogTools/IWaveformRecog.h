@@ -15,6 +15,11 @@ namespace wavrec_tool
         // Calculate multi-class probabilities for waveform
         virtual std::vector< std::vector<float> > predictWaveformType( const std::vector< std::vector<float> >& ) const = 0;
 
+        // ---------------------------------------------------------------------
+        // Return a vector of booleans of the same size as the input  waveform.
+	// The value of each element of the vector represents whether the 
+	// corresponding time bin of the waveform is in an ROI or not.
+        // ---------------------------------------------------------------------
         std::vector<bool> findROI(const std::vector<float>& adcin) const
         {
           std::vector<bool>bvec(fWaveformSize,false);
@@ -22,41 +27,11 @@ namespace wavrec_tool
             return bvec;
           }
 
-          // .. rescale input waveform for CNN
-          std::vector<float>adc(fWaveformSize);
-          for (size_t itck = 0; itck < fWaveformSize; ++itck){
-            adc[itck] = (adcin[itck] - meanvec[itck])/scalevec[itck];
-          }
+          std::vector<std::vector<float>> predv = scanWaveform(adcin);
 
-          // .. create a vector of windows
-          std::vector<std::vector<float>>wwv(fNumStrides+1, std::vector<float>(fWindowSize,0.));
-          std::vector<std::vector<float>>predv(fNumStrides+1, std::vector<float>(1,0.));
-
-          // .. fill each window with adc values
-          unsigned int j1, j2, k;
-          for (unsigned int i=0; i<fNumStrides; i++){
-            j1 = i*fStrideLength;
-            j2 = j1 + fWindowSize;
-            k = 0;
-            for (unsigned int j=j1; j<j2; j++){
-              wwv[i][k]=adc[j];
-              k++;
-            }
-          }
-          // .. last window is a special case
-          j1 = fNumStrides*fStrideLength;
-          j2 = j1 + fLastWindowSize;
-          k=0;
-          for (unsigned int j=j1; j<j2; j++){
-            wwv[fNumStrides][k]=adc[j];
-            k++;
-          }
-
-          // ... use waveform recognition CNN to perform inference on each window
-          predv = predictWaveformType(wwv);
-
-          // .. set all bins in the result vector, corresponding to windows identified as signals, to true
-          for (unsigned int i=0; i<fNumStrides; i++){
+          // .. set to true all bins in the output vector that are in windows identified as signals
+          int j1;
+	  for (unsigned int i=0; i<fNumStrides; i++){
             j1 = i*fStrideLength;
             if(predv[i][0]>0.5){
               std::fill_n(bvec.begin()+j1,fWindowSize,true);
@@ -68,6 +43,32 @@ namespace wavrec_tool
             std::fill_n(bvec.begin()+j1,fLastWindowSize,true);
           }
           return bvec;
+        }
+
+        // -------------------------------------------------------------
+        // Return a vector of floats of the same size as the input 
+	// waveform. The value in each bin represents the probability
+	// whether that bin is in an ROI or not
+        // -------------------------------------------------------------
+	std::vector<float> predROI(const std::vector<float>& adcin) const
+        {
+          std::vector<float>fvec(fWaveformSize,0.);
+          if(adcin.size()!=fWaveformSize){
+            return fvec;
+          }
+
+          std::vector<std::vector<float>> predv = scanWaveform(adcin);
+
+          // .. set value in each bin of output vector to the prediction for the window it is in
+          int j1;
+	  for (unsigned int i=0; i<fNumStrides; i++){
+            j1 = i*fStrideLength;
+            std::fill_n(fvec.begin()+j1,fWindowSize,predv[i][0]);
+          }
+          // .. last window is a special case
+          j1 = fNumStrides*fStrideLength;
+          std::fill_n(fvec.begin()+j1,fLastWindowSize,predv[fNumStrides][0]);
+          return fvec;
         }
 
     protected:
@@ -94,6 +95,43 @@ namespace wavrec_tool
           }
           return fname_out;
         }
+
+    private:
+        std::vector<std::vector<float>> scanWaveform(const std::vector<float>& adcin) const
+	{
+          // .. rescale input waveform for CNN
+          std::vector<float>adc(fWaveformSize);
+          for (size_t itck = 0; itck < fWaveformSize; ++itck){
+            adc[itck] = (adcin[itck] - meanvec[itck])/scalevec[itck];
+          }
+
+          // .. create a vector of windows
+          std::vector<std::vector<float>>wwv(fNumStrides+1, std::vector<float>(fWindowSize,0.));
+
+          // .. fill each window with adc values
+          unsigned int j1, j2, k;
+          for (unsigned int i=0; i<fNumStrides; i++){
+            j1 = i*fStrideLength;
+            j2 = j1 + fWindowSize;
+            k = 0;
+            for (unsigned int j=j1; j<j2; j++){
+              wwv[i][k]=adc[j];
+              k++;
+            }
+          }
+          // .. last window is a special case
+          j1 = fNumStrides*fStrideLength;
+          j2 = j1 + fLastWindowSize;
+          k=0;
+          for (unsigned int j=j1; j<j2; j++){
+            wwv[fNumStrides][k]=adc[j];
+            k++;
+          }
+
+          // ... use waveform recognition CNN to perform inference on each window
+          return predictWaveformType(wwv);
+	}
+
     };
 }
 
