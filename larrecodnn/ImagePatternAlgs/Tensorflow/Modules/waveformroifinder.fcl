@@ -17,8 +17,8 @@ standard_waveformroifinder:
        WaveformSize:       6000
        ScanWindowSize:     200
        StrideLength:       150
-       MeanFilename:       "CnnModels/wvrec-mean.txt"
-       ScaleFilename:      "CnnModels/wvrec-scale.txt"
+       CnnInputMean:       0.
+       CnnInputScale:      1.
        tool_type: "WaveformRecogTf"
     }
 }

@@ -72,8 +72,8 @@ namespace wavrec_tool
         }
 
     protected:
-        std::vector<float>scalevec;
-        std::vector<float>meanvec;
+        float fCnnInputMean;
+        float fCnnInputScale;
         unsigned int fWaveformSize;	    // Full waveform size
         unsigned int fWindowSize;	    // Scan window size
         unsigned int fStrideLength;	    // Offset (in #time ticks) between scan windows
@@ -102,7 +102,7 @@ namespace wavrec_tool
           // .. rescale input waveform for CNN
           std::vector<float>adc(fWaveformSize);
           for (size_t itck = 0; itck < fWaveformSize; ++itck){
-            adc[itck] = (adcin[itck] - meanvec[itck])/scalevec[itck];
+            adc[itck] = (adcin[itck] - fCnnInputMean)/fCnnInputScale;
           }
 
           // .. create a vector of windows
