@@ -121,8 +121,10 @@ namespace wavrec_tool
           } else {
             float fCnnMean=pset.get<float>("CnnMean",0.);
             float fCnnScale=pset.get<float>("CnnScale",1.);
-            meanvec.resize(fWaveformSize,fCnnMean);
-            scalevec.resize(fWaveformSize,fCnnScale);
+            meanvec.resize(fWaveformSize);
+	    std::fill(meanvec.begin(),meanvec.end(),fCnnMean);
+            scalevec.resize(fWaveformSize);
+	    std::fill(scalevec.begin(),scalevec.end(),fCnnScale);
           }
 
           fWindowSize=pset.get<unsigned int>("ScanWindowSize", 0); // 200
