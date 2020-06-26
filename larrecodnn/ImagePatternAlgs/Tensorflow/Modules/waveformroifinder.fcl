@@ -8,7 +8,7 @@ standard_waveformroifinder:
        NNetModelFile: "CnnModels/lightmodel112.pb"
        NNetOutputPattern: [
           "cnn_output",
-          "dense_1"
+          "dense_3"
        ]
        #TrtisModelName:     "lightmodel112"
        #TrtisURL:          "localhost:8001"

@@ -72,15 +72,6 @@ namespace wavrec_tool
         }
 
     protected:
-        std::vector<float>scalevec;
-        std::vector<float>meanvec;
-	float fCnnPredCut;
-        unsigned int fWaveformSize;	    // Full waveform size
-        unsigned int fWindowSize;	    // Scan window size
-        unsigned int fStrideLength;	    // Offset (in #time ticks) between scan windows
-        unsigned int fNumStrides;
-        unsigned int fLastWindowSize;
-
         std::string findFile(const char* fileName) const
         {
           std::string fname_out;
@@ -97,7 +88,71 @@ namespace wavrec_tool
           return fname_out;
         }
 
+        void setupWaveRecRoiParams(const fhicl::ParameterSet & pset)
+	{
+          fCnnPredCut=pset.get<float>("CnnPredCut", 0.5);
+          fWaveformSize=pset.get<unsigned int>("WaveformSize", 0); // 6000
+          std::string fMeanFilename=pset.get< std::string >("MeanFilename","");
+          std::string fScaleFilename=pset.get< std::string >("ScaleFilename","");
+
+          // ... load the mean and scale (std) vectors
+          if(!fMeanFilename.empty() && !fScaleFilename.empty()){
+            float val;
+            std::ifstream meanfile(findFile(fMeanFilename.c_str()).c_str());
+            if (meanfile.is_open()){
+              while(meanfile >> val)meanvec.push_back(val);
+              meanfile.close();
+              if (meanvec.size()!=fWaveformSize){
+          	throw cet::exception("WaveformRecogTf_tool") << "vector of mean values does not match waveform size, exiting" << std::endl;
+              }
+            } else {
+              throw cet::exception("WaveformRecogTf_tool") << "failed opening StdScaler mean file, exiting" << std::endl;
+            }
+            std::ifstream scalefile(findFile(fScaleFilename.c_str()).c_str());
+            if (scalefile.is_open()){
+              while(scalefile >> val)scalevec.push_back(val);
+              scalefile.close();
+              if (scalevec.size()!=fWaveformSize){
+          	throw cet::exception("WaveformRecogTf_tool") << "vector of scale values does not match waveform size, exiting" << std::endl;
+              }
+            } else {
+              throw cet::exception("WaveformRecogTf_tool") << "failed opening StdScaler scale file, exiting" << std::endl;
+            }
+          } else {
+            float fCnnMean=pset.get<float>("CnnMean",0.);
+            float fCnnScale=pset.get<float>("CnnScale",1.);
+            meanvec.resize(fWaveformSize,fCnnMean);
+            scalevec.resize(fWaveformSize,fCnnScale);
+          }
+
+          fWindowSize=pset.get<unsigned int>("ScanWindowSize", 0); // 200
+          fStrideLength=pset.get<unsigned int>("StrideLength", 0); // 150
+
+          if(fWaveformSize>0 && fWindowSize>0){ 
+            float dmn = fWaveformSize - fWindowSize;  // dist between trail edge of 1st win & last data point
+            fNumStrides = std::ceil(dmn/float(fStrideLength));        // # strides to scan entire waveform
+            unsigned int overshoot = fNumStrides*fStrideLength+fWindowSize - fWaveformSize;
+            fLastWindowSize = fWindowSize - overshoot;
+            unsigned int numwindows = fNumStrides + 1;
+            std::cout << " !!!!! WaveformRoiFinder: WindowSize = " << fWindowSize << ", StrideLength = "
+          	      << fStrideLength << ", dmn/StrideLength = " << dmn/fStrideLength << std::endl;
+            std::cout << "	 dmn = " << dmn << ", NumStrides = " << fNumStrides << ", overshoot = " << overshoot
+          	      << ", LastWindowSize = " << fLastWindowSize << ", numwindows = " << numwindows << std::endl;
+          }
+	}
+
     private:
+        std::vector<float>scalevec;
+        std::vector<float>meanvec;
+	float fCnnMean;
+	float fCnnScale;
+	float fCnnPredCut;
+        unsigned int fWaveformSize;	    // Full waveform size
+        unsigned int fWindowSize;	    // Scan window size
+        unsigned int fStrideLength;	    // Offset (in #time ticks) between scan windows
+        unsigned int fNumStrides;
+        unsigned int fLastWindowSize;
+
         std::vector<std::vector<float>> scanWaveform(const std::vector<float>& adcin) const
 	{
           // .. rescale input waveform for CNN
