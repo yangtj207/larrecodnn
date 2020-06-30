@@ -1,5 +1,4 @@
 #include "art/Utilities/ToolMacros.h"
-
 #include "messagefacility/MessageLogger/MessageLogger.h"
 #include "tensorflow/core/public/session.h"
 #include "larrecodnn/ImagePatternAlgs/Tensorflow/TF/tf_graph.h"
@@ -20,7 +19,6 @@ namespace wavrec_tool
     std::unique_ptr<tf::Graph> g; // network graph
     std::string fNNetModelFilePath;
     std::vector< std::string > fNNetOutputPattern;
-    std::string findFile(const char* fileName) const;
 
   };
 
@@ -37,23 +35,9 @@ namespace wavrec_tool
     } else {
       mf::LogError("WaveformRecogTf") << "File name extension not supported.";
     }
-  }
 
-  // ------------------------------------------------------
-  std::string WaveformRecogTf::findFile(const char* fileName) const
-  {
-    std::string fname_out;
-    cet::search_path sp("FW_SEARCH_PATH");
-    if (!sp.find_file(fileName, fname_out)){
-      struct stat buffer;
-      if (stat(fileName, &buffer) == 0) {
-        fname_out = fileName;
-      } else {
-        throw art::Exception(art::errors::NotFound)
-          << "Could not find the model file " << fileName;
-      }
-    }
-    return fname_out;
+    setupWaveRecRoiParams(pset);
+
   }
 
   // ------------------------------------------------------
@@ -76,5 +60,6 @@ namespace wavrec_tool
 
     return g->run(_x);
   }
+
 }
 DEFINE_ART_CLASS_TOOL(wavrec_tool::WaveformRecogTf)
