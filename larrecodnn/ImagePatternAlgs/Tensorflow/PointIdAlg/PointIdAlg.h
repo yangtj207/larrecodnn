@@ -213,7 +213,7 @@ public:
 		kConv  = 0x8000000,       // gamma conversion
 		kElectronEnd = 0x10000000,// clear end of an electron
                 kElastic     = 0x20000000,// Elastic scattering
-                kInelastic   = 0x40000000 // Inelastic scattering 
+                kInelastic   = 0x40000000 // Inelastic scattering
 	};
 
     struct Config : public img::DataProviderAlg::Config

@@ -26,7 +26,7 @@ def main(argv):
     raw_keys = [k.GetName() for k in file0.Get(args.module).GetListOfKeys() if view_base + '_raw' in k.GetName()]
     pdg_keys = [k.GetName() for k in file0.Get(args.module).GetListOfKeys() if view_base + '_pdg' in k.GetName()]
     dep_keys = [k.GetName() for k in file0.Get(args.module).GetListOfKeys() if view_base + '_deposit' in k.GetName()]
-    
+
     ev_idx = int(args.event)
     if ev_idx >= len(raw_keys):
         print 'event index out of range'
