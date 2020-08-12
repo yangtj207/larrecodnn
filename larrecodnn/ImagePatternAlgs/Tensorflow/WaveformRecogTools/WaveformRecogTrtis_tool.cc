@@ -1,5 +1,4 @@
 #include "art/Utilities/ToolMacros.h"
-
 #include "larrecodnn/ImagePatternAlgs/Tensorflow/WaveformRecogTools/IWaveformRecog.h"
 #include "messagefacility/MessageLogger/MessageLogger.h"
 
@@ -59,6 +58,8 @@ namespace wavrec_tool {
     mf::LogInfo("WaveformRecogTrtis") << "verbose: " << fTrtisVerbose;
 
     mf::LogInfo("WaveformRecogTrtis") << "tensorRT inference context created.";
+
+    setupWaveRecRoiParams(pset);
   }
 
   // ------------------------------------------------------
@@ -149,5 +150,6 @@ namespace wavrec_tool {
 
     return out;
   }
+
 }
 DEFINE_ART_CLASS_TOOL(wavrec_tool::WaveformRecogTrtis)

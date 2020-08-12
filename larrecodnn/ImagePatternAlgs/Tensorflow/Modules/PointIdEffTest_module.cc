@@ -314,7 +314,6 @@ nnet::PointIdEffTest::analyze(art::Event const& e)
 
   fRun = e.run();
   fEvent = e.id().event();
-  // std::cout << "event " << fEvent << std::endl;
 
   // access to MC information
 

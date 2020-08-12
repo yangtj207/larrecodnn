@@ -75,7 +75,7 @@ drop1 = 0.2
 densesize1 = 128
 actfn1 = 'relu'
 densesize2 = 32
-actfn2 = 'relu' 
+actfn2 = 'relu'
 drop2 = 0.2
 
 #######################  CNN definition  ############################
