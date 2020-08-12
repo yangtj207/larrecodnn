@@ -16,16 +16,15 @@
 #include "art_root_io/TFileService.h"
 #include "canvas/Utilities/InputTag.h"
 #include "fhiclcpp/ParameterSet.h"
-#include "messagefacility/MessageLogger/MessageLogger.h"
 #include "lardata/ArtDataHelper/MVAReader.h"
 #include "lardataobj/RecoBase/Hit.h"
+#include "messagefacility/MessageLogger/MessageLogger.h"
 
 #include "TTree.h"
 
 namespace pdsp {
   class CheckCNNScore;
 }
-
 
 class pdsp::CheckCNNScore : public art::EDAnalyzer {
 public:
@@ -46,13 +45,12 @@ public:
   void beginJob() override;
 
 private:
-
   // Declare member data here.
   // Input parameters
-  art::InputTag fNNetModuleLabel;   // label of the module used for CNN tagging
-  art::InputTag fHitsModuleLabel;   // label of hit finder module
+  art::InputTag fNNetModuleLabel; // label of the module used for CNN tagging
+  art::InputTag fHitsModuleLabel; // label of hit finder module
 
-  TTree *ftree;
+  TTree* ftree;
   int run;
   int subrun;
   int event;
@@ -67,15 +65,14 @@ private:
   std::vector<double> score_none;
 };
 
-
 pdsp::CheckCNNScore::CheckCNNScore(fhicl::ParameterSet const& p)
-  : EDAnalyzer{p},
-  fNNetModuleLabel(p.get<art::InputTag>("NNetModuleLabel")),
-  fHitsModuleLabel(p.get<art::InputTag>("HitsModuleLabel"))
-{
-}
+  : EDAnalyzer{p}
+  , fNNetModuleLabel(p.get<art::InputTag>("NNetModuleLabel"))
+  , fHitsModuleLabel(p.get<art::InputTag>("HitsModuleLabel"))
+{}
 
-void pdsp::CheckCNNScore::analyze(art::Event const& e)
+void
+pdsp::CheckCNNScore::analyze(art::Event const& e)
 {
 
   run = e.run();
@@ -91,21 +88,20 @@ void pdsp::CheckCNNScore::analyze(art::Event const& e)
   score_el.clear();
   score_none.clear();
 
-  anab::MVAReader<recob::Hit,3> hitResults(e, fNNetModuleLabel);
+  anab::MVAReader<recob::Hit, 3> hitResults(e, fNNetModuleLabel);
 
-  art::Handle< std::vector<recob::Hit> > hitListHandle;
-  std::vector<art::Ptr<recob::Hit> > hitlist;
-  if (e.getByLabel(fHitsModuleLabel,hitListHandle))
-    art::fill_ptr_vector(hitlist, hitListHandle);
+  art::Handle<std::vector<recob::Hit>> hitListHandle;
+  std::vector<art::Ptr<recob::Hit>> hitlist;
+  if (e.getByLabel(fHitsModuleLabel, hitListHandle)) art::fill_ptr_vector(hitlist, hitListHandle);
 
   // loop over hits
   //  for (size_t h = 0; h < hitResults.size(); ++h) {
-  for (auto & hit : hitlist){
+  for (auto& hit : hitlist) {
 
     // Get cnn output for hit h
-    std::array<float,3> cnn_out = hitResults.getOutput(hit);
+    std::array<float, 3> cnn_out = hitResults.getOutput(hit);
 
-    if (hit->WireID().Plane == 2){
+    if (hit->WireID().Plane == 2) {
       channel.push_back(hit->Channel());
       tpc.push_back(hit->WireID().TPC);
       plane.push_back(hit->WireID().Plane);
@@ -115,18 +111,19 @@ void pdsp::CheckCNNScore::analyze(art::Event const& e)
       score_inel.push_back(cnn_out[hitResults.getIndex("inel")]);
       score_el.push_back(cnn_out[hitResults.getIndex("el")]);
       score_none.push_back(cnn_out[hitResults.getIndex("none")]);
-//      std::cout<<hit->WireID().TPC<<" "
-//               <<hit->WireID().Wire<<" "
-//               <<hit->PeakTime()<<" "
-//               <<cnn_out[hitResults.getIndex("el")]<<" "
-//               <<cnn_out[hitResults.getIndex("inel")]<<" "
-//               <<cnn_out[hitResults.getIndex("none")]<<std::endl;
+      //      std::cout<<hit->WireID().TPC<<" "
+      //               <<hit->WireID().Wire<<" "
+      //               <<hit->PeakTime()<<" "
+      //               <<cnn_out[hitResults.getIndex("el")]<<" "
+      //               <<cnn_out[hitResults.getIndex("inel")]<<" "
+      //               <<cnn_out[hitResults.getIndex("none")]<<std::endl;
     }
   }
   if (!channel.empty()) ftree->Fill();
 }
 
-void pdsp::CheckCNNScore::beginJob()
+void
+pdsp::CheckCNNScore::beginJob()
 {
   art::ServiceHandle<art::TFileService> fileServiceHandle;
   ftree = fileServiceHandle->make<TTree>("ftree", "hit info");

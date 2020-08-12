@@ -22,12 +22,11 @@
 #include "canvas/Utilities/InputTag.h"
 #include "fhiclcpp/ParameterSet.h"
 #include "messagefacility/MessageLogger/MessageLogger.h"
-#include "canvas/Utilities/InputTag.h"
 
-#include "lardataobj/RecoBase/Wire.h"
+#include "larcore/Geometry/Geometry.h"
 #include "lardataobj/RawData/RawDigit.h"
 #include "lardataobj/RawData/raw.h"
-#include "larcore/Geometry/Geometry.h"
+#include "lardataobj/RecoBase/Wire.h"
 #include "larrecodnn/ImagePatternAlgs/Tensorflow/WaveformRecogTools/IWaveformRecog.h"
 
 #include <memory>
@@ -35,7 +34,6 @@
 namespace nnet {
   class WaveformRoiFinder;
 }
-
 
 class nnet::WaveformRoiFinder : public art::EDProducer {
 public:
@@ -53,58 +51,57 @@ public:
   void produce(art::Event& e) override;
 
 private:
-
-  unsigned int fWaveformSize;		// Full waveform size
+  unsigned int fWaveformSize; // Full waveform size
 
   art::InputTag fRawProducerLabel;
   art::InputTag fWireProducerLabel;
   std::unique_ptr<wavrec_tool::IWaveformRecog> fWaveformRecogTool;
-
 };
 
-
 nnet::WaveformRoiFinder::WaveformRoiFinder(fhicl::ParameterSet const& p)
-  : EDProducer{p}  ,
-  fWaveformSize(p.get<unsigned int>("WaveformSize", 6000)),
-  fRawProducerLabel(p.get<art::InputTag>("RawProducerLabel","")),
-  fWireProducerLabel(p.get<art::InputTag>("WireProducerLabel",""))
+  : EDProducer{p}
+  , fWaveformSize(p.get<unsigned int>("WaveformSize", 6000))
+  , fRawProducerLabel(p.get<art::InputTag>("RawProducerLabel", ""))
+  , fWireProducerLabel(p.get<art::InputTag>("WireProducerLabel", ""))
 {
 
-  if (fRawProducerLabel.empty() && fWireProducerLabel.empty()){
-    throw cet::exception("WaveformRoiFinder") << "Both RawProducerLabel and WireProducerLabel are empty";
+  if (fRawProducerLabel.empty() && fWireProducerLabel.empty()) {
+    throw cet::exception("WaveformRoiFinder")
+      << "Both RawProducerLabel and WireProducerLabel are empty";
   }
 
-  if ((!fRawProducerLabel.empty()) && (!fWireProducerLabel.empty())){
-    throw cet::exception("WaveformRoiFinder") << "Only one of RawProducerLabel and WireProducerLabel should be set";
+  if ((!fRawProducerLabel.empty()) && (!fWireProducerLabel.empty())) {
+    throw cet::exception("WaveformRoiFinder")
+      << "Only one of RawProducerLabel and WireProducerLabel should be set";
   }
 
   // Signal/Noise waveform recognition tool
-  fWaveformRecogTool = art::make_tool<wavrec_tool::IWaveformRecog>(p.get<fhicl::ParameterSet>("WaveformRecog"));
+  fWaveformRecogTool =
+    art::make_tool<wavrec_tool::IWaveformRecog>(p.get<fhicl::ParameterSet>("WaveformRecog"));
 
-  produces< std::vector<recob::Wire> >();
-
+  produces<std::vector<recob::Wire>>();
 }
 
-void nnet::WaveformRoiFinder::produce(art::Event& e)
+void
+nnet::WaveformRoiFinder::produce(art::Event& e)
 {
 
-  std::cout<<fRawProducerLabel<<std::endl;
+  std::cout << fRawProducerLabel << std::endl;
 
-  art::Handle< std::vector<raw::RawDigit> > rawListHandle;
-  std::vector<art::Ptr<raw::RawDigit> > rawlist;
-  if (e.getByLabel(fRawProducerLabel, rawListHandle))
-    art::fill_ptr_vector(rawlist, rawListHandle);
+  art::Handle<std::vector<raw::RawDigit>> rawListHandle;
+  std::vector<art::Ptr<raw::RawDigit>> rawlist;
+  if (e.getByLabel(fRawProducerLabel, rawListHandle)) art::fill_ptr_vector(rawlist, rawListHandle);
 
   //std::cout<<rawlist.size()<<std::endl;
 
-  art::Handle< std::vector<recob::Wire> > wireListHandle;
-  std::vector<art::Ptr<recob::Wire> > wirelist;
+  art::Handle<std::vector<recob::Wire>> wireListHandle;
+  std::vector<art::Ptr<recob::Wire>> wirelist;
   if (e.getByLabel(fWireProducerLabel, wireListHandle))
     art::fill_ptr_vector(wirelist, wireListHandle);
 
   //auto wireHandle = e.getValidHandle< std::vector<recob::Wire> >(fWireProducerLabel);
 
-  std::unique_ptr<std::vector<recob::Wire> > outwires(new std::vector<recob::Wire>);
+  std::unique_ptr<std::vector<recob::Wire>> outwires(new std::vector<recob::Wire>);
 
   auto const* geo = lar::providerFrom<geo::Geometry>();
 
@@ -113,31 +110,31 @@ void nnet::WaveformRoiFinder::produce(art::Event& e)
   //##############################
   //for(size_t wireIter = 0; wireIter < wireHandle->size(); wireIter++){
   //std::cout<<"size = "<<(rawlist.empty()?wirelist.size():rawlist.size())<<std::endl;
-  for (unsigned int ich = 0; ich < (rawlist.empty()?wirelist.size():rawlist.size()); ++ich){
-    
+  for (unsigned int ich = 0; ich < (rawlist.empty() ? wirelist.size() : rawlist.size()); ++ich) {
+
     std::vector<float> inputsignal(fWaveformSize);
 
-    if (!wirelist.empty()){
-      const auto & wire = wirelist[ich];
+    if (!wirelist.empty()) {
+      const auto& wire = wirelist[ich];
       //art::Ptr<recob::Wire>   wire(wireHandle, wireIter);
-      const auto & signal = wire->Signal();
+      const auto& signal = wire->Signal();
 
-      for (size_t itck = 0; itck < inputsignal.size(); ++itck){
+      for (size_t itck = 0; itck < inputsignal.size(); ++itck) {
         inputsignal[itck] = signal[itck];
       }
     }
-    else if (!rawlist.empty()){
+    else if (!rawlist.empty()) {
       //std::cout<<ich<<std::endl;
-      const auto & digitVec = rawlist[ich];
+      const auto& digitVec = rawlist[ich];
       std::vector<short> rawadc(fWaveformSize);
       raw::Uncompress(digitVec->ADCs(), rawadc, digitVec->GetPedestal(), digitVec->Compression());
-      for (size_t itck = 0; itck < rawadc.size(); ++itck){
+      for (size_t itck = 0; itck < rawadc.size(); ++itck) {
         inputsignal[itck] = rawadc[itck] - digitVec->GetPedestal();
       }
     }
 
     // ... use waveform recognition CNN to perform inference on each window
-    std::vector<bool>inroi(fWaveformSize,false);
+    std::vector<bool> inroi(fWaveformSize, false);
     inroi = fWaveformRecogTool->findROI(inputsignal);
 
     std::vector<float> sigs;
@@ -146,15 +143,15 @@ void nnet::WaveformRoiFinder::produce(art::Event& e)
 
     recob::Wire::RegionsOfInterest_t rois(fWaveformSize);
 
-    for (size_t i = 0; i<fWaveformSize; ++i){
-      if (inroi[i]){
-        if (sigs.empty()){
+    for (size_t i = 0; i < fWaveformSize; ++i) {
+      if (inroi[i]) {
+        if (sigs.empty()) {
           sigs.push_back(inputsignal[i]);
           lastsignaltick = i;
           roistart = i;
         }
-        else{
-          if (int(i)!=lastsignaltick+1){
+        else {
+          if (int(i) != lastsignaltick + 1) {
             rois.add_range(roistart, std::move(sigs));
             sigs.clear();
             sigs.push_back(inputsignal[i]);
@@ -168,19 +165,17 @@ void nnet::WaveformRoiFinder::produce(art::Event& e)
         }
       }
     }
-    if (!sigs.empty()){
-      rois.add_range(roistart, std::move(sigs));
-    }
-    if (!wirelist.empty()){
+    if (!sigs.empty()) { rois.add_range(roistart, std::move(sigs)); }
+    if (!wirelist.empty()) {
       outwires->emplace_back(recob::Wire(rois, wirelist[ich]->Channel(), wirelist[ich]->View()));
     }
-    else if (!rawlist.empty()){
-      outwires->emplace_back(recob::Wire(rois, rawlist[ich]->Channel(), geo->View(rawlist[ich]->Channel())));
+    else if (!rawlist.empty()) {
+      outwires->emplace_back(
+        recob::Wire(rois, rawlist[ich]->Channel(), geo->View(rawlist[ich]->Channel())));
     }
   }
 
   e.put(std::move(outwires));
-
 }
 
 DEFINE_ART_MODULE(nnet::WaveformRoiFinder)
