@@ -14,24 +14,23 @@
 
 #include <sys/stat.h>
 
-namespace PointIdAlgTools
-{
+namespace PointIdAlgTools {
 
   class PointIdAlgKeras : public IPointIdAlg {
   public:
-    explicit PointIdAlgKeras(const fhicl::ParameterSet& pset) :
-             PointIdAlgKeras(fhicl::Table<Config>(pset, {})())
-	     {}
+    explicit PointIdAlgKeras(const fhicl::ParameterSet& pset)
+      : PointIdAlgKeras(fhicl::Table<Config>(pset, {})())
+    {}
     explicit PointIdAlgKeras(const Config& config);
 
-    std::vector<float> Run(std::vector< std::vector<float> > const & inp2d) const override;
-    std::vector< std::vector<float> > Run(std::vector< std::vector< std::vector<float> > > const & inps, int samples = -1) const override;
+    std::vector<float> Run(std::vector<std::vector<float>> const& inp2d) const override;
+    std::vector<std::vector<float>> Run(std::vector<std::vector<std::vector<float>>> const& inps,
+                                        int samples = -1) const override;
 
   private:
     std::unique_ptr<keras::KerasModel> m;
     std::string fNNetModelFilePath;
     std::string findFile(const char* fileName) const;
-
   };
 
   // ------------------------------------------------------
@@ -46,17 +45,17 @@ namespace PointIdAlgTools
 
     // ... Get "optional" config vars specific to tf interface
     std::string s_cfgvr;
-    if ( config.NNetModelFile(s_cfgvr) ) {
-      fNNetModelFilePath = s_cfgvr;
-    } else {
+    if (config.NNetModelFile(s_cfgvr)) { fNNetModelFilePath = s_cfgvr; }
+    else {
       fNNetModelFilePath = "mycnn";
     }
 
     if ((fNNetModelFilePath.length() > 5) &&
-      (fNNetModelFilePath.compare(fNNetModelFilePath.length() - 5, 5, ".nnet") == 0)){
-      m = std::make_unique<keras::KerasModel>(findFile(fNNetModelFilePath.c_str() ).c_str() );
+        (fNNetModelFilePath.compare(fNNetModelFilePath.length() - 5, 5, ".nnet") == 0)) {
+      m = std::make_unique<keras::KerasModel>(findFile(fNNetModelFilePath.c_str()).c_str());
       mf::LogInfo("PointIdAlgKeras") << "Keras model loaded.";
-    } else {
+    }
+    else {
       mf::LogError("PointIdAlgKeras") << "File name extension not supported.";
     }
 
@@ -64,26 +63,26 @@ namespace PointIdAlgTools
   }
 
   // ------------------------------------------------------
-  std::string PointIdAlgKeras::findFile(const char* fileName) const
+  std::string
+  PointIdAlgKeras::findFile(const char* fileName) const
   {
     std::string fname_out;
     cet::search_path sp("FW_SEARCH_PATH");
-    if (!sp.find_file(fileName, fname_out)){
+    if (!sp.find_file(fileName, fname_out)) {
       struct stat buffer;
-      if (stat(fileName, &buffer) == 0) {
-        fname_out = fileName;
-      } else {
-        throw art::Exception(art::errors::NotFound)
-          << "Could not find the model file " << fileName;
+      if (stat(fileName, &buffer) == 0) { fname_out = fileName; }
+      else {
+        throw art::Exception(art::errors::NotFound) << "Could not find the model file " << fileName;
       }
     }
     return fname_out;
   }
 
   // ------------------------------------------------------
-  std::vector<float> PointIdAlgKeras::Run(std::vector< std::vector<float> > const & inp2d) const
+  std::vector<float>
+  PointIdAlgKeras::Run(std::vector<std::vector<float>> const& inp2d) const
   {
-    std::vector< std::vector< std::vector<float> > > inp3d;
+    std::vector<std::vector<std::vector<float>>> inp3d;
     inp3d.push_back(inp2d); // lots of copy, should add 2D to keras...
 
     keras::DataChunk2D sample;
@@ -92,22 +91,23 @@ namespace PointIdAlgTools
   }
 
   // ------------------------------------------------------
-  std::vector< std::vector<float> > PointIdAlgKeras::Run(std::vector< std::vector< std::vector<float> > > const & inps, int samples) const
+  std::vector<std::vector<float>>
+  PointIdAlgKeras::Run(std::vector<std::vector<std::vector<float>>> const& inps, int samples) const
   {
 
     if ((samples == 0) || inps.empty() || inps.front().empty() || inps.front().front().empty()) {
-      return std::vector< std::vector<float> >();
+      return std::vector<std::vector<float>>();
     }
 
     if ((samples == -1) || (samples > (long long int)inps.size())) { samples = inps.size(); }
 
-    std::vector< std::vector<float> > out;
+    std::vector<std::vector<float>> out;
 
     for (long long int s = 0; s < samples; ++s) {
-      std::vector< std::vector< std::vector<float> > > inp3d;
+      std::vector<std::vector<std::vector<float>>> inp3d;
       inp3d.push_back(inps[s]); // lots of copy, should add 2D to keras...
 
-      keras::DataChunk *sample = new keras::DataChunk2D();
+      keras::DataChunk* sample = new keras::DataChunk2D();
       sample->set_data(inp3d); // and more copy...
       out.push_back(m->compute_output(sample));
       delete sample;
