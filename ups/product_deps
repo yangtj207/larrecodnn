@@ -1,13 +1,13 @@
 # The parent line must be the first non-comment line in the file
 # This line defines the product name and version
-parent	larrecodnn v09_00_02
+parent	larrecodnn v09_00_03
 defaultqual	e19
 #
 fcldir product_dir job
 fwdir  product_dir config_data
 #
 product         version
-larreco         v09_00_02
+larreco         v09_00_03
 trtis_clients   v19_11b		-	optional
 tensorflow      v1_12_0c	-	optional
 cetbuildtools   v7_15_01	-	only_for_build
