@@ -22,16 +22,16 @@
 #include "fhiclcpp/ParameterSet.h"
 #include "messagefacility/MessageLogger/MessageLogger.h"
 
-#include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
-#include "lardata/DetectorInfoServices/DetectorClocksService.h"
 #include "larcore/Geometry/Geometry.h"
-#include "lardataobj/Simulation/SimChannel.h"
+#include "lardata/DetectorInfoServices/DetectorClocksService.h"
+#include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
 #include "lardataobj/RecoBase/Wire.h"
+#include "lardataobj/Simulation/SimChannel.h"
 #include "larevt/CalibrationDBI/Interface/ChannelStatusService.h"
 #include "larevt/CalibrationDBI/Interface/ChannelStatusProvider.h"
 
-#include "TH1D.h"
 #include "TEfficiency.h"
+#include "TH1D.h"
 
 using namespace std;
 
@@ -96,8 +96,9 @@ void nnet::EvaluateROIEff::analyze(art::Event const& e)
 {
 
   auto const* geo = lar::providerFrom<geo::Geometry>();
-  auto const* detprop = lar::providerFrom<detinfo::DetectorPropertiesService>();
-  auto const* tclk = lar::providerFrom<detinfo::DetectorClocksService>();
+  auto const clockData = art::ServiceHandle<detinfo::DetectorClocksService>()->DataFor(e);
+  auto const detProp =
+    art::ServiceHandle<detinfo::DetectorPropertiesService>()->DataFor(e, clockData);
   auto const& chStatus = art::ServiceHandle< lariov::ChannelStatusService >()->GetProvider();
 
   art::Handle < std::vector < recob::Wire > > wireListHandle;
@@ -135,9 +136,9 @@ void nnet::EvaluateROIEff::analyze(art::Event const& e)
     for ( auto const& timeSlice : timeSlices ){
       auto const tpctime = timeSlice.first;
       auto const& energyDeposits = timeSlice.second;
-      int tdctick = static_cast<int>(tclk->TPCTDC2Tick(double(tpctime)));
-      if(tdctick<0 || tdctick>int(detprop->ReadOutWindowSize())-1) continue;
-      
+      int tdctick = static_cast<int>(clockData.TPCTDC2Tick(double(tpctime)));
+      if (tdctick < 0 || tdctick > int(detProp.ReadOutWindowSize()) - 1) continue;
+
       // for a time slice, there may exist more than one energy deposit.
       double e_deposit = 0;
       for ( auto const& energyDeposit : energyDeposits ){
@@ -333,8 +334,8 @@ void nnet::EvaluateROIEff::analyze(art::Event const& e)
         for ( auto const& timeSlice : timeSlices ){
           auto const tpctime = timeSlice.first;
           auto const& energyDeposits = timeSlice.second;
-          int tdctick = static_cast<int>(tclk->TPCTDC2Tick(double(tpctime)));
-          if(tdctick<0 || tdctick>int(detprop->ReadOutWindowSize())-1) continue;
+          int tdctick = static_cast<int>(clockData.TPCTDC2Tick(double(tpctime)));
+          if (tdctick < 0 || tdctick > int(detProp.ReadOutWindowSize()) - 1) continue;
 
           double e_deposit = 0;
           for ( auto const& energyDeposit : energyDeposits ){
