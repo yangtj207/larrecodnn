@@ -386,8 +386,8 @@ nnet::RawWaveformDump::analyze(art::Event const& evt)
         auto const& energyDeposits = timeSlice.second;
         auto const tpctime = timeSlice.first;
         unsigned int tdctick = static_cast<unsigned int>(clockData.TPCTDC2Tick(double(tpctime)));
-        if (tdctick != tpctime)
-          std::cout << "tpctime: " << tpctime << ", tdctick: " << tdctick << std::endl;
+        //if (tdctick != tpctime)
+        //  std::cout << "tpctime: " << tpctime << ", tdctick: " << tdctick << std::endl;
         if (tdctick < 0 || tdctick > (dataSize - 1)) continue;
 
         // ... Loop over all energy depositions in this tick
