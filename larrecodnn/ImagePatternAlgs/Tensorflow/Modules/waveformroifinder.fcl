@@ -1,69 +1,36 @@
 BEGIN_PROLOG
 
+tool_WaveformRecog:
+{
+    NNetModelFile: "CnnModels/lightmodel112.pb"
+    NNetOutputPattern: [
+        "cnn_output",
+        "dense_3"
+    ]
+    #TrtisModelName:     "lightmodel112"
+    #TrtisURL:          "localhost:8001"
+    #TrtisModelVersion:  -1
+    #TrtisVerbose:      true
+    WaveformSize:       6000
+    ScanWindowSize:     200
+    StrideLength:       150
+    MeanFilename:       "CnnModels/wvrec-mean.txt"
+    ScaleFilename:      "CnnModels/wvrec-scale.txt"
+    CnnPredCut:         0.5
+    tool_type: "WaveformRecogTf"
+}
+
+
 standard_waveformroifinder:
 {
     module_type: "WaveformRoiFinder"
-    NPlanes:         3
-    WaveformSize:    6000
-    RawProducerLabel:   ""
     WireProducerLabel:  "caldata:dataprep"
 
-    WaveformRecogPlane0: {
-       NNetModelFile: "CnnModels/lightmodel112.pb"
-       NNetOutputPattern: [
-          "cnn_output",
-          "dense_3"
-       ]
-       #TrtisModelName:     "lightmodel112"
-       #TrtisURL:          "localhost:8001"
-       #TrtisModelVersion:  -1
-       #TrtisVerbose:      true
-       WaveformSize:       6000
-       ScanWindowSize:     200
-       StrideLength:       150
-       MeanFilename:       "CnnModels/wvrec-mean.txt"
-       ScaleFilename:      "CnnModels/wvrec-scale.txt"
-       CnnPredCut:         0.5
-       tool_type: "WaveformRecogTf"
-    }
-
-    WaveformRecogPlane1: {
-       NNetModelFile: "CnnModels/lightmodel112.pb"
-       NNetOutputPattern: [
-          "cnn_output",
-          "dense_3"
-       ]
-       #TrtisModelName:     "lightmodel112"
-       #TrtisURL:          "localhost:8001"
-       #TrtisModelVersion:  -1
-       #TrtisVerbose:      true
-       WaveformSize:       6000
-       ScanWindowSize:     200
-       StrideLength:       150
-       MeanFilename:       "CnnModels/wvrec-mean.txt"
-       ScaleFilename:      "CnnModels/wvrec-scale.txt"
-       CnnPredCut:         0.5
-       tool_type: "WaveformRecogTf"
-    }
-
-    WaveformRecogPlane2: {
-       NNetModelFile: "CnnModels/lightmodel112.pb"
-       NNetOutputPattern: [
-          "cnn_output",
-          "dense_3"
-       ]
-       #TrtisModelName:     "lightmodel112"
-       #TrtisURL:          "localhost:8001"
-       #TrtisModelVersion:  -1
-       #TrtisVerbose:      true
-       WaveformSize:       6000
-       ScanWindowSize:     200
-       StrideLength:       150
-       MeanFilename:       "CnnModels/wvrec-mean.txt"
-       ScaleFilename:      "CnnModels/wvrec-scale.txt"
-       CnnPredCut:         0.5
-       tool_type: "WaveformRecogTf"
-    }
+    WaveformRecogs: [
+        @local::tool_WaveformRecog,
+        @local::tool_WaveformRecog,
+        @local::tool_WaveformRecog
+    ] 
 }
 
 END_PROLOG

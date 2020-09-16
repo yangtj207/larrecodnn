@@ -52,19 +52,17 @@ public:
   void produce(art::Event& e) override;
 
 private:
-  int fNPlanes; // number of wire planes: 3 for ProtoDUNE, 2 for ArgoNeut
-  unsigned int fWaveformSize; // Full waveform size
-
   art::InputTag fRawProducerLabel;
   art::InputTag fWireProducerLabel;
 
   std::vector<std::unique_ptr<wavrec_tool::IWaveformRecog>> fWaveformRecogToolVec;
+
+  int fNPlanes;
+  unsigned int fWaveformSize; // Full waveform size
 };
 
 nnet::WaveformRoiFinder::WaveformRoiFinder(fhicl::ParameterSet const& p)
   : EDProducer{p}
-  , fNPlanes(p.get<int>("NPlanes",3))
-  , fWaveformSize(p.get<unsigned int>("WaveformSize", 6000))
   , fRawProducerLabel(p.get<art::InputTag>("RawProducerLabel", ""))
   , fWireProducerLabel(p.get<art::InputTag>("WireProducerLabel", ""))
 {
@@ -79,12 +77,15 @@ nnet::WaveformRoiFinder::WaveformRoiFinder(fhicl::ParameterSet const& p)
       << "Only one of RawProducerLabel and WireProducerLabel should be set";
   }
 
+  auto const* geo = lar::providerFrom<geo::Geometry>();
+  fNPlanes = geo->Nplanes();
+
   // Signal/Noise waveform recognition tool
-  fWaveformRecogToolVec.resize(fNPlanes);
-  for (int n=0; n<fNPlanes; n++) {
-    char planeWaveformRecog[30];
-    sprintf(planeWaveformRecog, "WaveformRecogPlane%d",n);
-    fWaveformRecogToolVec[n] = art::make_tool<wavrec_tool::IWaveformRecog>(p.get<fhicl::ParameterSet>(planeWaveformRecog));
+  fWaveformRecogToolVec.reserve(fNPlanes);
+  auto const tool_psets = p.get<std::vector<fhicl::ParameterSet>>("WaveformRecogs");
+  fWaveformSize = tool_psets[0].get<unsigned int>("WaveformSize");
+  for (auto const& pset : tool_psets) {
+    fWaveformRecogToolVec.push_back(art::make_tool<wavrec_tool::IWaveformRecog>(pset));
   }
 
   produces<std::vector<recob::Wire>>();
@@ -112,7 +113,7 @@ nnet::WaveformRoiFinder::produce(art::Event& e)
   for (unsigned int ich = 0; ich < (rawlist.empty() ? wirelist.size() : rawlist.size()); ++ich) {
 
     std::vector<float> inputsignal(fWaveformSize);
-    
+
     int view = -1;
 
     if (!wirelist.empty()) {
@@ -136,7 +137,6 @@ nnet::WaveformRoiFinder::produce(art::Event& e)
         inputsignal[itck] = rawadc[itck] - digitVec->GetPedestal();
       }
     }
-    
 
     // ... use waveform recognition CNN to perform inference on each window
     std::vector<bool> inroi(fWaveformSize, false);
