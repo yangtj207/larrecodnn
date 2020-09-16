@@ -6,6 +6,7 @@
 // Authors:     Mike Wang (mwang@fnal.gov)
 //              Lorenzo Uboldi (uboldi.lorenzo@gmail.com)
 //              Tingjun Yang (tjyang@fnal.gov)
+//              Wanwei Wu (wwu@fnal.gov)
 //
 // Generated at Fri Apr 10 23:30:12 2020 by Tingjun Yang using cetskelgen
 // from cetlib version v3_10_00.
@@ -51,20 +52,23 @@ public:
   void produce(art::Event& e) override;
 
 private:
+  int fNPlanes; // number of wire planes: 3 for ProtoDUNE, 2 for ArgoNeut
   unsigned int fWaveformSize; // Full waveform size
 
   art::InputTag fRawProducerLabel;
   art::InputTag fWireProducerLabel;
-  std::unique_ptr<wavrec_tool::IWaveformRecog> fWaveformRecogTool;
+
+  std::vector<std::unique_ptr<wavrec_tool::IWaveformRecog>> fWaveformRecogToolVec;
 };
 
 nnet::WaveformRoiFinder::WaveformRoiFinder(fhicl::ParameterSet const& p)
   : EDProducer{p}
+  , fNPlanes(p.get<int>("NPlanes",3))
   , fWaveformSize(p.get<unsigned int>("WaveformSize", 6000))
   , fRawProducerLabel(p.get<art::InputTag>("RawProducerLabel", ""))
   , fWireProducerLabel(p.get<art::InputTag>("WireProducerLabel", ""))
 {
-
+  // use either raw waveform or recob waveform
   if (fRawProducerLabel.empty() && fWireProducerLabel.empty()) {
     throw cet::exception("WaveformRoiFinder")
       << "Both RawProducerLabel and WireProducerLabel are empty";
@@ -76,8 +80,12 @@ nnet::WaveformRoiFinder::WaveformRoiFinder(fhicl::ParameterSet const& p)
   }
 
   // Signal/Noise waveform recognition tool
-  fWaveformRecogTool =
-    art::make_tool<wavrec_tool::IWaveformRecog>(p.get<fhicl::ParameterSet>("WaveformRecog"));
+  fWaveformRecogToolVec.resize(fNPlanes);
+  for (int n=0; n<fNPlanes; n++) {
+    char planeWaveformRecog[30];
+    sprintf(planeWaveformRecog, "WaveformRecogPlane%d",n);
+    fWaveformRecogToolVec[n] = art::make_tool<wavrec_tool::IWaveformRecog>(p.get<fhicl::ParameterSet>(planeWaveformRecog));
+  }
 
   produces<std::vector<recob::Wire>>();
 }
@@ -104,10 +112,14 @@ nnet::WaveformRoiFinder::produce(art::Event& e)
   for (unsigned int ich = 0; ich < (rawlist.empty() ? wirelist.size() : rawlist.size()); ++ich) {
 
     std::vector<float> inputsignal(fWaveformSize);
+    
+    int view = -1;
 
     if (!wirelist.empty()) {
       const auto& wire = wirelist[ich];
       const auto& signal = wire->Signal();
+
+      view = wire->View();
 
       for (size_t itck = 0; itck < inputsignal.size(); ++itck) {
         inputsignal[itck] = signal[itck];
@@ -115,16 +127,20 @@ nnet::WaveformRoiFinder::produce(art::Event& e)
     }
     else if (!rawlist.empty()) {
       const auto& digitVec = rawlist[ich];
+
+      view = geo->View(rawlist[ich]->Channel());
+
       std::vector<short> rawadc(fWaveformSize);
       raw::Uncompress(digitVec->ADCs(), rawadc, digitVec->GetPedestal(), digitVec->Compression());
       for (size_t itck = 0; itck < rawadc.size(); ++itck) {
         inputsignal[itck] = rawadc[itck] - digitVec->GetPedestal();
       }
     }
+    
 
     // ... use waveform recognition CNN to perform inference on each window
     std::vector<bool> inroi(fWaveformSize, false);
-    inroi = fWaveformRecogTool->findROI(inputsignal);
+    inroi = fWaveformRecogToolVec[view]->findROI(inputsignal);
 
     std::vector<float> sigs;
     int lastsignaltick = -1;
