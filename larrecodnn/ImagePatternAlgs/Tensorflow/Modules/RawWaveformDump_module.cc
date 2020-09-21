@@ -4,6 +4,11 @@
 //
 //  mwang@fnal.gov
 //  tjyang@fnal.gov
+//  wwu@fnal.gov
+//
+//  Include the following options:
+//    a) RawDigit or WireProducer
+//    b) save full waveform or short waveform
 //
 //////////////////////////////////////////////
 
@@ -31,10 +36,14 @@
 #include "lardataobj/RawData/RawDigit.h"
 #include "lardataobj/RawData/raw.h"
 #include "lardataobj/RecoBase/Hit.h"
+#include "lardataobj/RecoBase/Wire.h"
 #include "lardataobj/Simulation/SimChannel.h"
 #include "larsim/MCCheater/ParticleInventoryService.h"
 #include "nusimdata/SimulationBase/MCParticle.h"
 #include "nusimdata/SimulationBase/MCTruth.h"
+
+#include "larevt/CalibrationDBI/Interface/ChannelStatusProvider.h"
+#include "larevt/CalibrationDBI/Interface/ChannelStatusService.h"
 
 // DUNETPC specific includes
 //#include "dune/DAQTriggerSim/TriggerDataProducts/TriggerTypes.h"
@@ -42,6 +51,7 @@
 //#include "dune/DuneInterface/AdcTypes.h"
 //#include "dune/DuneInterface/SimChannelExtractService.h"
 
+#include "TRandom.h"
 #include "c2numpy.h"
 
 using std::cout;
@@ -88,6 +98,9 @@ private:
   std::string
     fSimulationProducerLabel; ///< The name of the producer that tracked simulated particles through the detector
   std::string fDigitModuleLabel; ///< module that made digits
+  std::string fWireProducerLabel;
+  bool fUseFullWaveform;
+  unsigned int fShortWaveformSize;
 
   std::string fSelectGenLabel;
   std::string fSelectProcID;
@@ -154,6 +167,9 @@ nnet::RawWaveformDump::RawWaveformDump(fhicl::ParameterSet const& p)
   , fDumpWaveformsFileName(p.get<std::string>("DumpWaveformsFileName", "dumpwaveforms"))
   , fSimulationProducerLabel(p.get<std::string>("SimulationProducerLabel", "largeant"))
   , fDigitModuleLabel(p.get<std::string>("DigitModuleLabel", "daq"))
+  , fWireProducerLabel(p.get<std::string>("WireProducerLabel"))
+  , fUseFullWaveform(p.get<bool>("UseFullWaveform", true))
+  , fShortWaveformSize(p.get<unsigned int>("ShortWaveformSize"))
   , fSelectGenLabel(p.get<std::string>("SelectGenLabel", "ANY"))
   , fSelectProcID(p.get<std::string>("SelectProcID", "ANY"))
   , fSelectPDGCode(p.get<int>("SelectPDGCode", 0))
@@ -165,6 +181,17 @@ nnet::RawWaveformDump::RawWaveformDump(fhicl::ParameterSet const& p)
   , fSaveSignal(p.get<bool>("SaveSignal", true))
 {
   if (std::getenv("PROCESS")) { fDumpWaveformsFileName += string(std::getenv("PROCESS")) + "-"; }
+
+  if (fDigitModuleLabel.empty() && fWireProducerLabel.empty()) {
+    throw cet::exception("RawWaveformDump")
+      << "Both DigitModuleLabel and WireProducerLabel are empty";
+  }
+
+  if ((!fDigitModuleLabel.empty()) && (!fWireProducerLabel.empty())) {
+    throw cet::exception("RawWaveformDump")
+      << "Only one of DigitModuleLabel and WireProducerLabel should be set";
+  }
+
   //this->reconfigure(p);
 }
 
@@ -219,7 +246,9 @@ nnet::RawWaveformDump::beginJob()
     c2numpy_addcolumn(&npywriter, name.str().c_str(), C2NUMPY_UINT16);
   }
 
-  for (unsigned int i = 0; i < detProp.ReadOutWindowSize(); i++) {
+  for (unsigned int i = 0;
+       i < (fUseFullWaveform ? detProp.ReadOutWindowSize() : fShortWaveformSize);
+       i++) {
     std::ostringstream name;
     name << "tck_" << i;
     c2numpy_addcolumn(&npywriter, name.str().c_str(), C2NUMPY_INT16);
@@ -242,31 +271,65 @@ nnet::RawWaveformDump::analyze(art::Event const& evt)
 
   // ... Read in the digit List object(s).
   art::Handle<std::vector<raw::RawDigit>> digitVecHandle;
-  evt.getByLabel(fDigitModuleLabel, digitVecHandle);
+  std::vector<art::Ptr<raw::RawDigit>> rawdigitlist;
+  if (evt.getByLabel(fDigitModuleLabel, digitVecHandle)) {
+    art::fill_ptr_vector(rawdigitlist, digitVecHandle);
+  }
 
-  if (!digitVecHandle->size()) return;
+  // ... Read in the wire List object(s).
+  art::Handle<std::vector<recob::Wire>> wireListHandle;
+  std::vector<art::Ptr<recob::Wire>> wirelist;
+  if (evt.getByLabel(fWireProducerLabel, wireListHandle)) {
+    art::fill_ptr_vector(wirelist, wireListHandle);
+  }
+
+  if (rawdigitlist.empty() && wirelist.empty()) return;
+  if (rawdigitlist.size() && wirelist.size()) return;
+
+  // channel status
+  lariov::ChannelStatusProvider const& channelStatus =
+    art::ServiceHandle<lariov::ChannelStatusService const>()->GetProvider();
 
   auto const clockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(evt);
-  auto const detProp = art::ServiceHandle<detinfo::DetectorPropertiesService const>()->DataFor(evt, clockData);
+  auto const detProp =
+    art::ServiceHandle<detinfo::DetectorPropertiesService const>()->DataFor(evt, clockData);
 
   // ... Use the handle to get a particular (0th) element of collection.
-  art::Ptr<raw::RawDigit> digitVec0(digitVecHandle, 0);
-  unsigned int dataSize = digitVec0->Samples(); //size of raw data vectors
+  unsigned int dataSize;
+  if (rawdigitlist.size()) {
+    art::Ptr<raw::RawDigit> digitVec0(digitVecHandle, 0);
+    dataSize = digitVec0->Samples(); //size of raw data vectors
+  }
+  else {
+    dataSize = (wirelist[0]->Signal()).size();
+  }
   if (dataSize != detProp.ReadOutWindowSize()) {
     std::cout << "!!!!! Bad dataSize: " << dataSize << std::endl;
     return;
   }
 
-  std::vector<short> rawadc(dataSize); // vector to hold uncompressed adc values later
+  //std::vector<short> rawadc(dataSize); // vector to hold uncompressed adc values later
 
   // ... Build a map from channel number -> rawdigitVec
   std::map<raw::ChannelID_t, art::Ptr<raw::RawDigit>> rawdigitMap;
   raw::ChannelID_t chnum = raw::InvalidChannelID; // channel number
-  for (size_t rdIter = 0; rdIter < digitVecHandle->size(); ++rdIter) {
-    art::Ptr<raw::RawDigit> digitVec(digitVecHandle, rdIter);
-    chnum = digitVec->Channel();
-    if (chnum == raw::InvalidChannelID) continue;
-    rawdigitMap[chnum] = digitVec;
+  if (rawdigitlist.size()) {
+    for (size_t rdIter = 0; rdIter < digitVecHandle->size(); ++rdIter) {
+      art::Ptr<raw::RawDigit> digitVec(digitVecHandle, rdIter);
+      chnum = digitVec->Channel();
+      if (chnum == raw::InvalidChannelID) continue;
+      rawdigitMap[chnum] = digitVec;
+    }
+  }
+  // ... Build a map from channel number -> wire
+  std::map<raw::ChannelID_t, art::Ptr<recob::Wire>> wireMap;
+  if (wirelist.size()) {
+    for (size_t ich = 0; ich < wirelist.size(); ++ich) {
+      art::Ptr<recob::Wire> wire = wirelist[ich];
+      chnum = wire->Channel();
+      if (chnum == raw::InvalidChannelID) continue;
+      wireMap[chnum] = wire;
+    }
   }
 
   // ... Read in MC particle list
@@ -329,8 +392,6 @@ nnet::RawWaveformDump::analyze(art::Event const& evt)
         auto const& energyDeposits = timeSlice.second;
         auto const tpctime = timeSlice.first;
         unsigned int tdctick = static_cast<unsigned int>(clockData.TPCTDC2Tick(double(tpctime)));
-        if (tdctick != tpctime)
-          std::cout << "tpctime: " << tpctime << ", tdctick: " << tdctick << std::endl;
         if (tdctick < 0 || tdctick > (dataSize - 1)) continue;
 
         // ... Loop over all energy depositions in this tick
@@ -414,10 +475,28 @@ nnet::RawWaveformDump::analyze(art::Event const& evt)
         std::map<raw::ChannelID_t, std::map<int, WireSigInfo>>::iterator itchn;
         itchn = Ch2TrkWSInfoMap.find(chnum);
         if (itchn != Ch2TrkWSInfoMap.end()) {
-          auto search = rawdigitMap.find(chnum);
-          if (search == rawdigitMap.end()) continue;
-          art::Ptr<raw::RawDigit> rawdig = (*search).second;
-          raw::Uncompress(rawdig->ADCs(), rawadc, rawdig->GetPedestal(), rawdig->Compression());
+
+          std::vector<short> adcvec(dataSize); // vector to hold zero-padded full waveform
+
+          if (rawdigitlist.size()) {
+            auto search = rawdigitMap.find(chnum);
+            if (search == rawdigitMap.end()) continue;
+            art::Ptr<raw::RawDigit> rawdig = (*search).second;
+            std::vector<short> rawadc(dataSize); // vector to hold uncompressed adc values later
+            raw::Uncompress(rawdig->ADCs(), rawadc, rawdig->GetPedestal(), rawdig->Compression());
+            for (size_t j = 0; j < rawadc.size(); ++j) {
+              adcvec[j] = rawadc[j] - rawdig->GetPedestal();
+            }
+          }
+          else if (wirelist.size()) {
+            auto search = wireMap.find(chnum);
+            if (search == wireMap.end()) continue;
+            art::Ptr<recob::Wire> wire = (*search).second;
+            const auto& signal = wire->Signal();
+            for (size_t j = 0; j < adcvec.size(); ++j) {
+              adcvec[j] = signal[j];
+            }
+          }
 
           c2numpy_uint32(&npywriter, evt.id().event());
           c2numpy_uint32(&npywriter, chnum);
@@ -426,6 +505,12 @@ nnet::RawWaveformDump::analyze(art::Event const& evt)
                          itchn->second.size()); // size of Trk2WSInfoMap, or number of peaks
 
           // .. write out info for each peak
+          // a full waveform has at least one peak; the output will save up to 5 peaks (if there is only 1 peak, will fill the other 4 with 0);
+          // for fShortWaveformSize: only use the first peak's start_tick
+
+          int start_tick = -1;
+          int end_tick = -1;
+
           unsigned int icnt = 0;
           for (auto const& it : itchn->second) {
             c2numpy_int32(&npywriter, it.first);                  // trackid
@@ -434,8 +519,34 @@ nnet::RawWaveformDump::analyze(art::Event const& evt)
             c2numpy_string(&npywriter, it.second.procid.c_str()); // procid
             c2numpy_float32(&npywriter, it.second.edep);          // edepo
             c2numpy_uint32(&npywriter, it.second.numel);          // numelec
-            c2numpy_uint16(&npywriter, it.second.tdcmin);         // stck1
-            c2numpy_uint16(&npywriter, it.second.tdcmax);         // stc2
+
+            if (fUseFullWaveform) {
+              c2numpy_uint16(&npywriter, it.second.tdcmin); // stck1
+              c2numpy_uint16(&npywriter, it.second.tdcmax); // stc2
+            }
+            else {
+              // select ticks to save
+              if (icnt == 0) {
+                start_tick = it.second.tdcmin - it.second.tdcmin % fShortWaveformSize;
+                if (it.second.tdcmin - start_tick < 30) start_tick = start_tick - 30;
+                if (it.second.tdcmax - start_tick > 120) start_tick = it.second.tdcmax - 120;
+                end_tick = start_tick + fShortWaveformSize;
+
+                if (end_tick >= 2048) {
+                  end_tick = 2048;
+                  start_tick = end_tick - fShortWaveformSize;
+                }
+
+                if (start_tick < 0) {
+                  start_tick = 0;
+                  end_tick = start_tick + fShortWaveformSize;
+                }
+              }
+
+              c2numpy_uint16(&npywriter, it.second.tdcmin - start_tick); // stck1
+              c2numpy_uint16(&npywriter, it.second.tdcmax - start_tick); // stc2
+            }
+
             icnt++;
             if (icnt == 5) break;
           }
@@ -453,9 +564,17 @@ nnet::RawWaveformDump::analyze(art::Event const& evt)
           }
 
           // .. now write out the ADC values
-          for (unsigned int itck = 0; itck < dataSize; ++itck) {
-            rawadc[itck] -= rawdig->GetPedestal();
-            c2numpy_int16(&npywriter, rawadc[itck]);
+          if (fUseFullWaveform) {
+            for (unsigned int itck = 0; itck < dataSize; ++itck) {
+              c2numpy_int16(&npywriter, adcvec[itck]);
+            }
+          }
+          else {
+            if (start_tick == -1) return;
+
+            for (unsigned int itck = start_tick; itck < (start_tick + fShortWaveformSize); ++itck) {
+              c2numpy_int16(&npywriter, adcvec[itck]);
+            }
           }
         }
       }
@@ -469,16 +588,40 @@ nnet::RawWaveformDump::analyze(art::Event const& evt)
       signalMap[channel.Channel()] = true;
     }
 
-    std::vector<short> rawadc(dataSize); // vector to hold uncompressed adc values later
+    for (size_t rdIter = 0; rdIter < (rawdigitlist.empty() ? wirelist.size() : rawdigitlist.size());
+         ++rdIter) {
 
-    for (size_t rdIter = 0; rdIter < digitVecHandle->size(); ++rdIter) {
-      art::Ptr<raw::RawDigit> digitVec(digitVecHandle, rdIter);
-      if (signalMap[digitVec->Channel()]) continue;
-      if (geo::PlaneGeo::ViewName(fgeom->View(digitVec->Channel())) != fPlaneToDump[0]) continue;
-      raw::Uncompress(digitVec->ADCs(), rawadc, digitVec->GetPedestal(), digitVec->Compression());
-      c2numpy_uint32(&npywriter, evt.id().event());
-      c2numpy_uint32(&npywriter, digitVec->Channel());
-      c2numpy_string(&npywriter, geo::PlaneGeo::ViewName(fgeom->View(digitVec->Channel())).c_str());
+      std::vector<short> adcvec(dataSize); // vector to wire adc values
+
+      if (rawdigitlist.size()) {
+        art::Ptr<raw::RawDigit> digitVec(digitVecHandle, rdIter);
+        if (signalMap[digitVec->Channel()]) continue;
+
+        std::vector<short> rawadc(dataSize); // vector to hold uncompressed adc values later
+        if (geo::PlaneGeo::ViewName(fgeom->View(digitVec->Channel())) != fPlaneToDump[0]) continue;
+        raw::Uncompress(digitVec->ADCs(), rawadc, digitVec->GetPedestal(), digitVec->Compression());
+        for (size_t j = 0; j < rawadc.size(); ++j) {
+          adcvec[j] = rawadc[j] - digitVec->GetPedestal();
+        }
+        c2numpy_uint32(&npywriter, evt.id().event());
+        c2numpy_uint32(&npywriter, digitVec->Channel());
+        c2numpy_string(&npywriter,
+                       geo::PlaneGeo::ViewName(fgeom->View(digitVec->Channel())).c_str());
+      }
+      else if (wirelist.size()) {
+        art::Ptr<recob::Wire> wire = wirelist[rdIter];
+        if (signalMap[wire->Channel()]) continue;
+        if (channelStatus.IsBad(wire->Channel())) continue;
+        if (geo::PlaneGeo::ViewName(fgeom->View(wire->Channel())) != fPlaneToDump[0]) continue;
+        const auto& signal = wire->Signal();
+        for (size_t j = 0; j < adcvec.size(); ++j) {
+          adcvec[j] = signal[j];
+        }
+        c2numpy_uint32(&npywriter, evt.id().event());
+        c2numpy_uint32(&npywriter, wire->Channel());
+        c2numpy_string(&npywriter, geo::PlaneGeo::ViewName(fgeom->View(wire->Channel())).c_str());
+      }
+
       c2numpy_uint16(&npywriter, 0); //number of peaks
       for (unsigned int i = 0; i < 5; ++i) {
         c2numpy_int32(&npywriter, 0);
@@ -490,10 +633,19 @@ nnet::RawWaveformDump::analyze(art::Event const& evt)
         c2numpy_uint16(&npywriter, 0);
         c2numpy_uint16(&npywriter, 0);
       }
-      for (unsigned int itck = 0; itck < dataSize; ++itck) {
-        rawadc[itck] -= digitVec->GetPedestal();
-        c2numpy_int16(&npywriter, rawadc[itck]);
+
+      if (fUseFullWaveform) {
+        for (unsigned int itck = 0; itck < dataSize; ++itck) {
+          c2numpy_int16(&npywriter, adcvec[itck]);
+        }
       }
+      else {
+        int start_tick = int((2048 - fShortWaveformSize) * gRandom->Uniform(0, 1));
+        for (unsigned int itck = start_tick; itck < (start_tick + fShortWaveformSize); ++itck) {
+          c2numpy_int16(&npywriter, adcvec[itck]);
+        }
+      }
+
       ++noisechancount;
     }
     std::cout << "Total number of noise channels " << noisechancount << std::endl;
