@@ -464,8 +464,7 @@ nnet::RawWaveformDump::analyze(art::Event const& evt)
 
     } // loop over SimChannels
 
-    std::vector<raw::ChannelID_t> SelectedChannel;
-    SelectedChannel.clear();
+    std::set<raw::ChannelID_t> selected_channels;
 
     // ... Now write out the signal waveforms for each track
     if (!Trk2ChVecMap.empty()) {
@@ -475,11 +474,8 @@ nnet::RawWaveformDump::analyze(art::Event const& evt)
           rndm_dist(rndm_engine); // randomly select one channel with a signal from this particle
         chnum = ittrk.second[i];
 
-        if (std::find(SelectedChannel.begin(), SelectedChannel.end(), chnum) != SelectedChannel.end()) {
-          continue; // channel already used
-        }
-        else {
-          SelectedChannel.push_back(chnum);
+        if (not selected_channels.insert(chnum).second) {
+          continue;
         }
 
         std::map<raw::ChannelID_t, std::map<int, WireSigInfo>>::iterator itchn;
