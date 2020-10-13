@@ -5,7 +5,7 @@
 // Authors:     D.Stefan (dorota.stefan@cern.ch), from DUNE, CERN/NCBJ
 //              P.Plonski (pplonski86@gmail.com), from DUNE, WUT
 //              R.Sulej (robert.sulej@cern.ch),   from DUNE, FNAL/NCBJ
-//
+//              M.Wang (mwang@fnal.gov),          from DUNE, FNAL, tool interface ver
 // Module applies CNN to 2D image made of deconvoluted wire waveforms in order
 // to distinguish EM-like activity from track-like objects. In addition the activity
 // of Michel electrons is recognized. New clusters of hits are produced to include
@@ -19,23 +19,9 @@
 #include "art/Framework/Core/EDProducer.h"
 #include "art/Framework/Core/ModuleMacros.h"
 #include "art/Framework/Principal/Event.h"
-#include "art/Framework/Principal/Handle.h"
-#include "art/Framework/Principal/Run.h"
-#include "art/Framework/Services/System/TriggerNamesService.h"
-#include "canvas/Utilities/InputTag.h"
 #include "fhiclcpp/ParameterSet.h"
-#include "messagefacility/MessageLogger/MessageLogger.h"
-
-#include "larcore/Geometry/Geometry.h"
-#include "lardata/Utilities/AssociationUtil.h"
-#include "lardataobj/RecoBase/Cluster.h"
-#include "lardataobj/RecoBase/Hit.h"
-#include "lardataobj/RecoBase/Track.h"
 
 #include "larrecodnn/ImagePatternAlgs/Tensorflow/Modules/EmTrack.h"
-#include "larrecodnn/ImagePatternAlgs/Tensorflow/PointIdAlgTools/IPointIdAlg.h"
-
-#include <memory>
 
 namespace nnet {
 
