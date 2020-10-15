@@ -131,8 +131,8 @@ namespace PointIdAlgTools {
       size_t marginD = fPatchSizeD / 8;
 
       size_t scaledDrift = (size_t)(drift / fDriftWindow);
-      if ((wire >= marginW) && (wire < fNWires - marginW) && (scaledDrift >= marginD) &&
-          (scaledDrift < fNScaledDrifts - marginD)) {
+      if ((wire >= marginW) && (wire < fAlgView.fNWires - marginW) && (scaledDrift >= marginD) &&
+          (scaledDrift < fAlgView.fNScaledDrifts - marginD)) {
         return true;
       }
       else {

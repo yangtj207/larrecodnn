@@ -57,8 +57,6 @@ public:
     int samples = -1);
 
 protected:
-  ModelInterface() {}
-
   std::string findFile(const char* fileName) const;
 };
 // ------------------------------------------------------
@@ -97,7 +95,6 @@ public:
                                            Comment("Neural net model to apply.")};
     fhicl::Sequence<std::string> NNetOutputs{Name("NNetOutputs"),
                                              Comment("Labels of the network outputs.")};
-
     fhicl::Atom<unsigned int> PatchSizeW{Name("PatchSizeW"), Comment("How many wires in patch.")};
 
     fhicl::Atom<unsigned int> PatchSizeD{Name("PatchSizeD"),
@@ -306,18 +303,18 @@ public:
   }
 
 protected:
-  void resizeView(detinfo::DetectorClocksData const& clockData,
-                  detinfo::DetectorPropertiesData const& detProp,
-                  size_t wires,
-                  size_t drifts) override;
+  img::DataProviderAlgView resizeView(detinfo::DetectorClocksData const& clock_data,
+                                      detinfo::DetectorPropertiesData const& det_prop,
+                                      size_t wires,
+                                      size_t drifts) override;
 
 private:
   struct WireDrift // used to find MCParticle start/end 2D projections
   {
     size_t Wire;
     int Drift;
-    int TPC;
-    int Cryo;
+    unsigned int TPC;
+    unsigned int Cryo;
   };
 
   WireDrift getProjection(detinfo::DetectorClocksData const& clockData,

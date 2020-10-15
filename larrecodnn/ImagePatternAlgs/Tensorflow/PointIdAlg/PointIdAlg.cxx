@@ -319,8 +319,8 @@ nnet::PointIdAlg::isInsideFiducialRegion(unsigned int wire, float drift) const
   size_t marginD = fPatchSizeD / 8;
 
   size_t scaledDrift = (size_t)(drift / fDriftWindow);
-  if ((wire >= marginW) && (wire < fNWires - marginW) && (scaledDrift >= marginD) &&
-      (scaledDrift < fNScaledDrifts - marginD))
+  if ((wire >= marginW) && (wire < fAlgView.fNWires - marginW) && (scaledDrift >= marginD) &&
+      (scaledDrift < fAlgView.fNScaledDrifts - marginD))
     return true;
   else
     return false;
@@ -349,25 +349,26 @@ nnet::TrainingDataAlg::TrainingDataAlg(const Config& config)
 nnet::TrainingDataAlg::~TrainingDataAlg() = default;
 // ------------------------------------------------------
 
-void
-nnet::TrainingDataAlg::resizeView(detinfo::DetectorClocksData const& clockData,
-                                  detinfo::DetectorPropertiesData const& detProp,
+img::DataProviderAlgView
+nnet::TrainingDataAlg::resizeView(detinfo::DetectorClocksData const& clock_data,
+                                  detinfo::DetectorPropertiesData const& det_prop,
                                   size_t wires,
                                   size_t drifts)
 {
-  img::DataProviderAlg::resizeView(clockData, detProp, wires, drifts);
+  auto view = img::DataProviderAlg::resizeView(clock_data, det_prop, wires, drifts);
 
   fWireDriftEdep.resize(wires);
   for (auto& w : fWireDriftEdep) {
-    w.resize(fNCachedDrifts);
+    w.resize(view.fNCachedDrifts);
     std::fill(w.begin(), w.end(), 0.0F);
   }
 
   fWireDriftPdg.resize(wires);
   for (auto& w : fWireDriftPdg) {
-    w.resize(fNCachedDrifts);
+    w.resize(view.fNCachedDrifts);
     std::fill(w.begin(), w.end(), 0);
   }
+  return view;
 }
 // ------------------------------------------------------
 
@@ -381,12 +382,12 @@ nnet::TrainingDataAlg::setWireEdepsAndLabels(std::vector<float> const& edeps,
   size_t dstep = 1;
   if (fDownscaleFullView) { dstep = fDriftWindow; }
 
-  if (edeps.size() / dstep > fNCachedDrifts) { return false; }
+  if (edeps.size() / dstep > fAlgView.fNCachedDrifts) { return false; }
 
   auto& wEdep = fWireDriftEdep[wireIdx];
   auto& wPdg = fWireDriftPdg[wireIdx];
 
-  for (size_t i = 0; i < fNCachedDrifts; ++i) {
+  for (size_t i = 0; i < fAlgView.fNCachedDrifts; ++i) {
     size_t i0 = i * dstep;
     size_t i1 = (i + 1) * dstep;
 
@@ -556,7 +557,6 @@ nnet::TrainingDataAlg::collectVtxFlags(
 
     double ekStart = 1000. * (particle.E() - particle.Mass());
     double ekEnd = 1000. * (particle.EndE() - particle.Mass());
-
     int pdg = abs(particle.PdgCode());
     int flagsStart = nnet::TrainingDataAlg::kNone;
     int flagsEnd = nnet::TrainingDataAlg::kNone;
@@ -665,13 +665,13 @@ nnet::TrainingDataAlg::collectVtxFlags(
     if (flagsStart != nnet::TrainingDataAlg::kNone) {
       auto wd = getProjection(clockData, detProp, particle.Position(), plane);
 
-      if ((wd.TPC == (int)fTPC) && (wd.Cryo == (int)fCryo)) {
+      if ((wd.TPC == TPC()) && (wd.Cryo == Cryo())) {
         wireToDriftToVtxFlags[wd.Wire][wd.Drift] |= flagsStart;
       }
     }
     if (flagsEnd != nnet::TrainingDataAlg::kNone) {
       auto wd = getProjection(clockData, detProp, particle.EndPosition(), plane);
-      if ((wd.TPC == (int)fTPC) && (wd.Cryo == (int)fCryo)) {
+      if ((wd.TPC == TPC()) && (wd.Cryo == Cryo())) {
         wireToDriftToVtxFlags[wd.Wire][wd.Drift] |= flagsEnd;
       }
     }
@@ -684,13 +684,13 @@ nnet::TrainingDataAlg::collectVtxFlags(
         for (auto const& couple1 : thisTrajectoryProcessMap1) {
           if ((truetraj.KeyToProcess(couple1.second)).find("Elastic") != std::string::npos) {
             auto wd = getProjection(clockData, detProp, truetraj.at(couple1.first).first, plane);
-            if ((wd.TPC == (int)fTPC) && (wd.Cryo == (int)fCryo)) {
+            if ((wd.TPC == TPC()) && (wd.Cryo == Cryo())) {
               wireToDriftToVtxFlags[wd.Wire][wd.Drift] |= nnet::TrainingDataAlg::kElastic;
             }
           }
           if ((truetraj.KeyToProcess(couple1.second)).find("Inelastic") != std::string::npos) {
             auto wd = getProjection(clockData, detProp, truetraj.at(couple1.first).first, plane);
-            if ((wd.TPC == (int)fTPC) && (wd.Cryo == (int)fCryo)) {
+            if ((wd.TPC == TPC()) && (wd.Cryo == Cryo())) {
               wireToDriftToVtxFlags[wd.Wire][wd.Drift] |= nnet::TrainingDataAlg::kInelastic;
             }
           }
@@ -738,8 +738,8 @@ nnet::TrainingDataAlg::setDataEventData(const art::Event& event,
   // Loop over wires (sorry about hard coded value) to fill in 1) pdg and 2) charge depo
   for (size_t widx = 0; widx < 240; ++widx) {
 
-    std::vector<float> labels_deposit(fNDrifts, 0); // full-drift-length buffers
-    std::vector<int> labels_pdg(fNDrifts, 0);
+    std::vector<float> labels_deposit(fAlgView.fNDrifts, 0); // full-drift-length buffers
+    std::vector<int> labels_pdg(fAlgView.fNDrifts, 0);
 
     // First, the charge depo
     for (size_t subwidx = 0; subwidx < Wirelist.size(); ++subwidx) {
@@ -890,13 +890,13 @@ nnet::TrainingDataAlg::setEventData(const art::Event& event,
   fEdepTot = 0;
 
   std::map<int, int> trackToPDG;
-  for (size_t widx = 0; widx < fNWires; ++widx) {
-    auto wireChannelNumber = fWireChannels[widx];
+  for (size_t widx = 0; widx < fAlgView.fNWires; ++widx) {
+    auto wireChannelNumber = fAlgView.fWireChannels[widx];
     if (wireChannelNumber == raw::InvalidChannelID) continue;
 
-    std::vector<float> labels_deposit(fNDrifts, 0);        // full-drift-length buffers,
-    std::vector<int> labels_pdg(labels_deposit.size(), 0); // both of the same size,
-    int labels_size = labels_deposit.size();               // cached as int for comparisons below
+    std::vector<float> labels_deposit(fAlgView.fNDrifts, 0); // full-drift-length buffers,
+    std::vector<int> labels_pdg(labels_deposit.size(), 0);   // both of the same size,
+    int labels_size = labels_deposit.size();                 // cached as int for comparisons below
 
     std::map<int, std::map<int, double>> timeToTrackToCharge;
     for (auto const& channel : *simChannelHandle) {
@@ -992,9 +992,7 @@ nnet::TrainingDataAlg::setEventData(const art::Event& event,
       int drift = drift_flags.first, flags = drift_flags.second;
       if ((drift >= 0) && (drift < labels_size)) { labels_pdg[drift] |= flags; }
     }
-
     setWireEdepsAndLabels(labels_deposit, labels_pdg, widx);
-
   } // for each Wire
 
   return true;
