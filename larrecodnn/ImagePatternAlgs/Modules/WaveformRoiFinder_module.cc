@@ -28,7 +28,7 @@
 #include "lardataobj/RawData/RawDigit.h"
 #include "lardataobj/RawData/raw.h"
 #include "lardataobj/RecoBase/Wire.h"
-#include "larrecodnn/ImagePatternAlgs/Tensorflow/WaveformRecogTools/IWaveformRecog.h"
+#include "larrecodnn/ImagePatternAlgs/ToolInterfaces/IWaveformRecog.h"
 
 #include <memory>
 

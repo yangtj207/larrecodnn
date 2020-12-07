@@ -9,7 +9,7 @@
 
 #include "art/Utilities/ToolMacros.h"
 
-#include "larrecodnn/ImagePatternAlgs/Tensorflow/PointIdAlgTools/IPointIdAlg.h"
+#include "larrecodnn/ImagePatternAlgs/ToolInterfaces/IPointIdAlg.h"
 #include "larrecodnn/ImagePatternAlgs/Tensorflow/TF/tf_graph.h"
 #include "tensorflow/core/public/session.h"
 

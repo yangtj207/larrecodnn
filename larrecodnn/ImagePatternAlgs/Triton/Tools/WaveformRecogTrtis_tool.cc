@@ -1,5 +1,5 @@
 #include "art/Utilities/ToolMacros.h"
-#include "larrecodnn/ImagePatternAlgs/Tensorflow/WaveformRecogTools/IWaveformRecog.h"
+#include "larrecodnn/ImagePatternAlgs/ToolInterfaces/IWaveformRecog.h"
 #include "messagefacility/MessageLogger/MessageLogger.h"
 
 // Nvidia TensorRT inference server client includes
