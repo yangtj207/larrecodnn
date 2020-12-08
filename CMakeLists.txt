@@ -47,27 +47,21 @@ find_ups_product( cetbuildtools )
 find_ups_product( postgresql )
 find_ups_product( range )
 find_ups_product( eigen )
+find_ups_product( protobuf )
 
 # macros for dictionary and simple_plugin
 include(ArtDictionary)
 include(ArtMake)
 include(BuildPlugins)
 
-# cannot build tensorflow with our clang
-# at this time, trtis_clients is only available for python 3
+# tensorflow is optional
 if( DEFINED ENV{TENSORFLOW_DIR} )
   # find tensorflow library
-  find_ups_product( protobuf )
   find_ups_product( tensorflow )
   cet_find_library(TENSORFLOW NAMES tensorflow-core PATHS ENV TENSORFLOW_LIB NO_DEFAULT_PATH )
   cet_find_library(PROTOBUF NAMES protobuf PATHS ENV PROTOBUF_LIB NO_DEFAULT_PATH )
-  # This is a hack for a broken tensorflow link, which
-  # requires -lrt for glibc earlier than 2.17 (i.e. SLF6)
-  # We take advantage of OSTYPE defined by cetbuildtools
-  if ( "${OSTYPE}" MATCHES "slf6" )
-    set(FOR_TENSORFLOW "-lrt")
-  endif ()
 endif ()
+# trtis_clients is optional
 if( DEFINED ENV{TRTIS_CLIENTS_DIR} )
   find_ups_product(trtis_clients)
 endif ()
