@@ -47,19 +47,22 @@ find_ups_product( cetbuildtools )
 find_ups_product( postgresql )
 find_ups_product( range )
 find_ups_product( eigen )
-find_ups_product( protobuf )
+find_ups_product( root )
 
 # macros for dictionary and simple_plugin
 include(ArtDictionary)
 include(ArtMake)
 include(BuildPlugins)
 
+if(( DEFINED ENV{TENSORFLOW_DIR} ) OR ( DEFINED ENV{TRTIS_CLIENTS_DIR} ))
+  find_ups_product( protobuf )
+  cet_find_library(PROTOBUF NAMES protobuf PATHS ENV PROTOBUF_LIB NO_DEFAULT_PATH )
+endif ()
 # tensorflow is optional
 if( DEFINED ENV{TENSORFLOW_DIR} )
   # find tensorflow library
   find_ups_product( tensorflow )
   cet_find_library(TENSORFLOW NAMES tensorflow-core PATHS ENV TENSORFLOW_LIB NO_DEFAULT_PATH )
-  cet_find_library(PROTOBUF NAMES protobuf PATHS ENV PROTOBUF_LIB NO_DEFAULT_PATH )
 endif ()
 # trtis_clients is optional
 if( DEFINED ENV{TRTIS_CLIENTS_DIR} )

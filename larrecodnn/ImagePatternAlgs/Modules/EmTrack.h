@@ -194,7 +194,7 @@ namespace nnet {
         util::CreateAssn(evt, *clusters, v, *clu2hit);
         cidx++;
 
-        fMVAWriter.template addOutput(cluID,
+        fMVAWriter.addOutput(cluID,
                                       vout); // add copy of the input cluster
       }
 
@@ -304,7 +304,7 @@ namespace nnet {
         trkHitPtrList[t], [&](art::Ptr<recob::Hit> const& ptr) {
           return (float)hitInFA[ptr.key()];
         });
-      fMVAWriter.template setOutput(trkID, t, vout);
+      fMVAWriter.setOutput(trkID, t, vout);
     }
   }
   template <size_t N>
@@ -443,7 +443,7 @@ namespace nnet {
 
     if (fDoTracks)
       make_tracks(evt, hitInFA);
-    fMVAWriter.template saveOutputs(evt);
+    fMVAWriter.saveOutputs(evt);
   }
   // ------------------------------------------------------
 
