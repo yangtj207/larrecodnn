@@ -244,7 +244,7 @@ namespace nnet {
         util::CreateAssn(evt, *clusters, cluster_hits, *clu2hit);
         cidx++;
 
-        fMVAWriter.template addOutput(
+        fMVAWriter.addOutput(
           cluID, vout); // add single-hit cluster tagging unclutered hit
       }
       mf::LogVerbatim("EmTrack")
@@ -378,7 +378,7 @@ namespace nnet {
 
         for (size_t k = 0; k < points.size(); ++k) {
           size_t h = keys[k];
-          fMVAWriter.template setOutput(hitID, h, batch_out[k]);
+          fMVAWriter.setOutput(hitID, h, batch_out[k]);
           if (fPointIdAlgTool->isInsideFiducialRegion(points[k].first,
                                                       points[k].second)) {
             hitInFA[h] = 1;

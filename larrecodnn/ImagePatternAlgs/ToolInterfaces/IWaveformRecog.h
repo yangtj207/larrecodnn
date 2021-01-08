@@ -124,8 +124,8 @@ namespace wavrec_tool {
         }
       }
       else {
-        float fCnnMean = pset.get<float>("CnnMean", 0.);
-        float fCnnScale = pset.get<float>("CnnScale", 1.);
+        fCnnMean = pset.get<float>("CnnMean", 0.);
+        fCnnScale = pset.get<float>("CnnScale", 1.);
         meanvec.resize(fWaveformSize);
         std::fill(meanvec.begin(), meanvec.end(), fCnnMean);
         scalevec.resize(fWaveformSize);
