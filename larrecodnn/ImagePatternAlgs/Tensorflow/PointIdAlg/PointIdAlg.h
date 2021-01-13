@@ -240,6 +240,9 @@ public:
     fhicl::Atom<art::InputTag> SimulationLabel{Name("SimulationLabel"),
                                                Comment("Tag of simulation producer.")};
 
+    fhicl::Atom<art::InputTag> SimChannelLabel{Name("SimChannelLabel"),
+                                               Comment("Tag of sim::SimChannel producer.")};
+
     fhicl::Atom<bool> SaveVtxFlags{Name("SaveVtxFlags"),
                                    Comment("Include (or not) vertex info in PDG map.")};
 
@@ -355,6 +358,7 @@ private:
   art::InputTag fHitProducerLabel;
   art::InputTag fTrackModuleLabel;
   art::InputTag fSimulationProducerLabel;
+  art::InputTag fSimChannelProducerLabel;
   bool fSaveVtxFlags;
   bool fSaveSimInfo;
 

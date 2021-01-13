@@ -338,10 +338,15 @@ nnet::TrainingDataAlg::TrainingDataAlg(const Config& config)
   , fHitProducerLabel(config.HitLabel())
   , fTrackModuleLabel(config.TrackLabel())
   , fSimulationProducerLabel(config.SimulationLabel())
+  , fSimChannelProducerLabel(config.SimChannelLabel())
   , fSaveVtxFlags(config.SaveVtxFlags())
   , fAdcDelay(config.AdcDelayTicks())
   , fEventsPerBin(100, 0)
 {
+  // If no sim channel producer is set then make it the same as the simulation label
+  if(fSimChannelProducerLabel.label().empty())
+    fSimChannelProducerLabel = fSimulationProducerLabel;
+
   fSaveSimInfo = !fSimulationProducerLabel.label().empty();
 }
 // ------------------------------------------------------
@@ -877,7 +882,7 @@ nnet::TrainingDataAlg::setEventData(const art::Event& event,
     event.getValidHandle<std::vector<simb::MCParticle>>(fSimulationProducerLabel);
 
   auto simChannelHandle =
-    event.getValidHandle<std::vector<sim::SimChannel>>(fSimulationProducerLabel);
+    event.getValidHandle<std::vector<sim::SimChannel>>(fSimChannelProducerLabel);
 
   std::unordered_map<int, const simb::MCParticle*> particleMap;
   for (auto const& particle : *particleHandle) {
