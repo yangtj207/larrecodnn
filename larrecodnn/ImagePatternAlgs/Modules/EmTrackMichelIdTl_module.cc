@@ -21,7 +21,7 @@
 #include "art/Framework/Principal/Event.h"
 #include "fhiclcpp/ParameterSet.h"
 
-#include "larrecodnn/ImagePatternAlgs/Tensorflow/Modules/EmTrack.h"
+#include "larrecodnn/ImagePatternAlgs/Modules/EmTrack.h"
 
 namespace nnet {
 
