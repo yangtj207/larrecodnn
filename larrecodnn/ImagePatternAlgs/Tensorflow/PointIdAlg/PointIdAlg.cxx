@@ -528,7 +528,8 @@ nnet::TrainingDataAlg::isMuonDecaying(
   bool hasElectron = false, hasNuMu = false, hasNuE = false;
 
   int pdg = abs(particle.PdgCode());
-  if ((pdg == 13) && (particle.EndProcess() == "FastScintillation")) // potential muon decay at rest
+  if ((pdg == 13) && (particle.EndProcess() == "FastScintillation" || particle.EndProcess() == "Decay")) // potential muon decay at rest
+  if ((pdg == 13)) // potential muon decay at rest
   {
     unsigned int nSec = particle.NumberDaughters();
     for (size_t d = 0; d < nSec; ++d) {
