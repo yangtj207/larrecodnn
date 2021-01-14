@@ -53,8 +53,8 @@ physics.analyzers.datadump.TrainingDataAlg.DownscaleFn:     "mean"       # downs
 
 # Input TPC / plane selection:
 #
-physics.analyzers.datadump.SelectedTPC:     [1]                          # all TPC's if empty list, or save data from selected TPC's only
-physics.analyzers.datadump.SelectedView:    [2]                          # all views if empty list, or save data from selected views only
+physics.analyzers.datadump.SelectedTPC:     [1, 2, 5, 6, 9, 10]                          # all TPC's if empty list, or save data from selected TPC's only
+physics.analyzers.datadump.SelectedView:    []                          # all views if empty list, or save data from selected views only
 
 # Output format and location:
 #
