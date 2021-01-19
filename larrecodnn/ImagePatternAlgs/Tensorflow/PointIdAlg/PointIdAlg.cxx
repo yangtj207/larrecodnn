@@ -528,7 +528,8 @@ nnet::TrainingDataAlg::isMuonDecaying(
   bool hasElectron = false, hasNuMu = false, hasNuE = false;
 
   int pdg = abs(particle.PdgCode());
-  if ((pdg == 13) && (particle.EndProcess() == "FastScintillation" || particle.EndProcess() == "Decay" || particle.EndProcess() == "muMinusCaptureAtRest")) // potential muon decay at rest
+  //if ((pdg == 13) && (particle.EndProcess() == "FastScintillation" || particle.EndProcess() == "Decay" || particle.EndProcess() == "muMinusCaptureAtRest")) // potential muon decay at rest
+  if ((pdg == 13) && (particle.EndProcess() == "FastScintillation" || particle.EndProcess() == "Decay")) // potential muon decay at rest
   {
     unsigned int nSec = particle.NumberDaughters();
     for (size_t d = 0; d < nSec; ++d) {
@@ -950,14 +951,25 @@ nnet::TrainingDataAlg::setEventData(const art::Event& event,
               }
             }
 
+            /*
             auto msearch = particleMap.find(particle.Mother());
             if (msearch != particleMap.end()) {
               auto const& mother = *((*msearch).second);
               if (pdg == 11) // electron, check if it is Michel
               {
                 if (nnet::TrainingDataAlg::isMuonDecaying(mother, particleMap)) {
+                  std::cout<<particle.Process()<<std::endl;
                   pdg |= nnet::TrainingDataAlg::kMichel; // tag Michel
                 }
+              }
+            }
+            */
+            if (pdg == 11){ // electron, check if it is Michel or delta ray
+              if (particle.Process() == "Decay"){
+                pdg |= nnet::TrainingDataAlg::kMichel; // tag Michel
+              }
+              else if (particle.Process() == "muIoni"){
+                pdg |= nnet::TrainingDataAlg::kDelta; // tag delta ray
               }
             }
           }
