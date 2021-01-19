@@ -46,7 +46,7 @@ physics:
 physics.analyzers.datadump.TrainingDataAlg.WireLabel: "wclsdatasp:gauss"
 physics.analyzers.datadump.TrainingDataAlg.SimulationLabel: "largeant"
 physics.analyzers.datadump.TrainingDataAlg.SimChannelLabel: "tpcrawdecoder:simpleSC"
-physics.analyzers.datadump.TrainingDataAlg.SaveVtxFlags:    true         # save (or not) interaction and decay vertex info
+physics.analyzers.datadump.TrainingDataAlg.SaveVtxFlags:    false         # save (or not) interaction and decay vertex info
 physics.analyzers.datadump.TrainingDataAlg.DriftWindow:     6            # downsampling window in drift ticks
 physics.analyzers.datadump.TrainingDataAlg.AdcDelayTicks:   0            # delay of ADC peak in drift ticks
 physics.analyzers.datadump.TrainingDataAlg.DownscaleFn:     "mean"       # downsampling function
