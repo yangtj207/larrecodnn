@@ -20,7 +20,7 @@
 #include "lardataobj/RecoBase/Cluster.h"
 #include "lardataobj/RecoBase/Hit.h"
 #include "lardataobj/RecoBase/Track.h"
-#include "larrecodnn/ImagePatternAlgs/Tensorflow/PointIdAlgTools/IPointIdAlg.h"
+#include "larrecodnn/ImagePatternAlgs/ToolInterfaces/IPointIdAlg.h"
 
 #include <memory>
 #include <unordered_map>
@@ -194,7 +194,7 @@ namespace nnet {
         util::CreateAssn(evt, *clusters, v, *clu2hit);
         cidx++;
 
-        fMVAWriter.template addOutput(cluID,
+        fMVAWriter.addOutput(cluID,
                                       vout); // add copy of the input cluster
       }
 
@@ -244,7 +244,7 @@ namespace nnet {
         util::CreateAssn(evt, *clusters, cluster_hits, *clu2hit);
         cidx++;
 
-        fMVAWriter.template addOutput(
+        fMVAWriter.addOutput(
           cluID, vout); // add single-hit cluster tagging unclutered hit
       }
       mf::LogVerbatim("EmTrack")
@@ -304,7 +304,7 @@ namespace nnet {
         trkHitPtrList[t], [&](art::Ptr<recob::Hit> const& ptr) {
           return (float)hitInFA[ptr.key()];
         });
-      fMVAWriter.template setOutput(trkID, t, vout);
+      fMVAWriter.setOutput(trkID, t, vout);
     }
   }
   template <size_t N>
@@ -378,7 +378,7 @@ namespace nnet {
 
         for (size_t k = 0; k < points.size(); ++k) {
           size_t h = keys[k];
-          fMVAWriter.template setOutput(hitID, h, batch_out[k]);
+          fMVAWriter.setOutput(hitID, h, batch_out[k]);
           if (fPointIdAlgTool->isInsideFiducialRegion(points[k].first,
                                                       points[k].second)) {
             hitInFA[h] = 1;
@@ -443,7 +443,7 @@ namespace nnet {
 
     if (fDoTracks)
       make_tracks(evt, hitInFA);
-    fMVAWriter.template saveOutputs(evt);
+    fMVAWriter.saveOutputs(evt);
   }
   // ------------------------------------------------------
 

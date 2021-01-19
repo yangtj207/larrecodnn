@@ -4,7 +4,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "art/Utilities/ToolMacros.h"
-#include "larrecodnn/ImagePatternAlgs/Tensorflow/PointIdAlgTools/IPointIdAlg.h"
+#include "larrecodnn/ImagePatternAlgs/ToolInterfaces/IPointIdAlg.h"
 
 // Nvidia TensorRT inference server client includes
 #include "trtis_clients/model_config.pb.h"

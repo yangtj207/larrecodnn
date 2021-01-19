@@ -10,7 +10,7 @@
 #include "art/Utilities/ToolMacros.h"
 
 #include "larrecodnn/ImagePatternAlgs/Keras/keras_model.h"
-#include "larrecodnn/ImagePatternAlgs/Tensorflow/PointIdAlgTools/IPointIdAlg.h"
+#include "larrecodnn/ImagePatternAlgs/ToolInterfaces/IPointIdAlg.h"
 
 #include <sys/stat.h>
 
