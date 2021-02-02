@@ -338,10 +338,15 @@ nnet::TrainingDataAlg::TrainingDataAlg(const Config& config)
   , fHitProducerLabel(config.HitLabel())
   , fTrackModuleLabel(config.TrackLabel())
   , fSimulationProducerLabel(config.SimulationLabel())
+  , fSimChannelProducerLabel(config.SimChannelLabel())
   , fSaveVtxFlags(config.SaveVtxFlags())
   , fAdcDelay(config.AdcDelayTicks())
   , fEventsPerBin(100, 0)
 {
+  // If no sim channel producer is set then make it the same as the simulation label
+  if(fSimChannelProducerLabel.label().empty())
+    fSimChannelProducerLabel = fSimulationProducerLabel;
+
   fSaveSimInfo = !fSimulationProducerLabel.label().empty();
 }
 // ------------------------------------------------------
@@ -523,7 +528,8 @@ nnet::TrainingDataAlg::isMuonDecaying(
   bool hasElectron = false, hasNuMu = false, hasNuE = false;
 
   int pdg = abs(particle.PdgCode());
-  if ((pdg == 13) && (particle.EndProcess() == "FastScintillation")) // potential muon decay at rest
+  //if ((pdg == 13) && (particle.EndProcess() == "FastScintillation" || particle.EndProcess() == "Decay" || particle.EndProcess() == "muMinusCaptureAtRest")) // potential muon decay at rest
+  if ((pdg == 13) && (particle.EndProcess() == "FastScintillation" || particle.EndProcess() == "Decay")) // potential muon decay at rest
   {
     unsigned int nSec = particle.NumberDaughters();
     for (size_t d = 0; d < nSec; ++d) {
@@ -540,7 +546,7 @@ nnet::TrainingDataAlg::isMuonDecaying(
       }
     }
   }
-
+  
   return (hasElectron && hasNuMu && hasNuE);
 }
 
@@ -877,7 +883,7 @@ nnet::TrainingDataAlg::setEventData(const art::Event& event,
     event.getValidHandle<std::vector<simb::MCParticle>>(fSimulationProducerLabel);
 
   auto simChannelHandle =
-    event.getValidHandle<std::vector<sim::SimChannel>>(fSimulationProducerLabel);
+    event.getValidHandle<std::vector<sim::SimChannel>>(fSimChannelProducerLabel);
 
   std::unordered_map<int, const simb::MCParticle*> particleMap;
   for (auto const& particle : *particleHandle) {
@@ -945,14 +951,25 @@ nnet::TrainingDataAlg::setEventData(const art::Event& event,
               }
             }
 
+            /*
             auto msearch = particleMap.find(particle.Mother());
             if (msearch != particleMap.end()) {
               auto const& mother = *((*msearch).second);
               if (pdg == 11) // electron, check if it is Michel
               {
                 if (nnet::TrainingDataAlg::isMuonDecaying(mother, particleMap)) {
+                  std::cout<<particle.Process()<<std::endl;
                   pdg |= nnet::TrainingDataAlg::kMichel; // tag Michel
                 }
+              }
+            }
+            */
+            if (pdg == 11){ // electron, check if it is Michel or delta ray
+              if (particle.Process() == "Decay"){
+                pdg |= nnet::TrainingDataAlg::kMichel; // tag Michel
+              }
+              else if (particle.Process() == "muIoni"){
+                pdg |= nnet::TrainingDataAlg::kDelta; // tag delta ray
               }
             }
           }

@@ -13,6 +13,7 @@ standard_pointidalg.PatchSizeD:      44 # with training data prep configuration 
 standard_trainingdataalg:                 @local::standard_dataprovideralg
 standard_trainingdataalg.WireLabel:       "caldata"
 standard_trainingdataalg.SimulationLabel: "largeant"
+standard_trainingdataalg.SimChannelLabel: ""    # If left empty, it takes the value of the SimulationLabel variable
 standard_trainingdataalg.SaveVtxFlags:     true
 standard_trainingdataalg.HitLabel:        ""    # used by functions dumping real data (so one has no MC truth
 standard_trainingdataalg.TrackLabel:      ""    # and need to go by reconstructed objects)
