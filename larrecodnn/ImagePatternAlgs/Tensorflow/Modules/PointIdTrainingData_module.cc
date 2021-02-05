@@ -34,6 +34,17 @@
 #include "TH2F.h" // ADC and deposit maps
 #include "TH2I.h" // PDG+vertex info map
 
+namespace {
+  template <typename Hist>
+  void writeAndDelete(Hist*& hist) {
+    if (!hist) return;
+    hist->Write();
+    delete hist;
+    hist = nullptr;
+  } // writeAndDelete()
+} // local namespace
+
+
 namespace nnet {
 
   class PointIdTrainingData : public art::EDAnalyzer {
@@ -84,6 +95,7 @@ namespace nnet {
     bool fCrop; /// crop data to event (set to false when dumping noise!)
 
     geo::GeometryCore const* fGeometry;
+    
   };
 
   //-----------------------------------------------------------------------
@@ -188,6 +200,11 @@ namespace nnet {
               }
             }
           }
+          
+          writeAndDelete(rawHist);
+          writeAndDelete(depHist);
+          writeAndDelete(pdgHist);
+          
         }
         else {
           std::ostringstream ss1;
