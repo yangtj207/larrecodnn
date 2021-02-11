@@ -95,7 +95,7 @@ namespace nnet {
     bool fCrop; /// crop data to event (set to false when dumping noise!)
 
     geo::GeometryCore const* fGeometry;
-    
+
   };
 
   //-----------------------------------------------------------------------
@@ -200,11 +200,11 @@ namespace nnet {
               }
             }
           }
-          
+
           writeAndDelete(rawHist);
           writeAndDelete(depHist);
           writeAndDelete(pdgHist);
-          
+
         }
         else {
           std::ostringstream ss1;
