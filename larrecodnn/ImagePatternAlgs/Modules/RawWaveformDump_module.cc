@@ -95,9 +95,9 @@ public:
 private:
   std::string fDumpWaveformsFileName;
 
-  std::string
-    fSimulationProducerLabel; ///< The name of the producer that tracked simulated particles through the detector
-  std::string fDigitModuleLabel; ///< module that made digits
+  std::string fSimulationProducerLabel; ///< producer that tracked simulated part. through detector
+  std::string fSimChannelLabel;         ///< module that made simchannels
+  std::string fDigitModuleLabel;        ///< module that made digits
   std::string fWireProducerLabel;
   bool fUseFullWaveform;
   unsigned int fShortWaveformSize;
@@ -165,8 +165,9 @@ std::unique_ptr<genFinder> gf(new genFinder());
 nnet::RawWaveformDump::RawWaveformDump(fhicl::ParameterSet const& p)
   : EDAnalyzer{p}
   , fDumpWaveformsFileName(p.get<std::string>("DumpWaveformsFileName", "dumpwaveforms"))
-  , fSimulationProducerLabel(p.get<std::string>("SimulationProducerLabel", "largeant"))
-  , fDigitModuleLabel(p.get<std::string>("DigitModuleLabel", "daq"))
+  , fSimulationProducerLabel(p.get<std::string>("SimulationProducerLabel", "larg4Main"))
+  , fSimChannelLabel(p.get<std::string>("SimChannelLabel", "elecDrift"))
+  , fDigitModuleLabel(p.get<std::string>("DigitModuleLabel", "simWire"))
   , fWireProducerLabel(p.get<std::string>("WireProducerLabel"))
   , fUseFullWaveform(p.get<bool>("UseFullWaveform", true))
   , fShortWaveformSize(p.get<unsigned int>("ShortWaveformSize"))
@@ -342,7 +343,7 @@ nnet::RawWaveformDump::analyze(art::Event const& evt)
 
   // ... Read in sim channel list
   auto simChannelHandle =
-    evt.getValidHandle<std::vector<sim::SimChannel>>(fSimulationProducerLabel);
+    evt.getValidHandle<std::vector<sim::SimChannel>>(fSimChannelLabel);
 
   if (!simChannelHandle->size()) return;
 
@@ -354,7 +355,7 @@ nnet::RawWaveformDump::analyze(art::Event const& evt)
 
   for (auto const& mcHandle : mcHandles) {
     const std::string& sModuleLabel = mcHandle.provenance()->moduleLabel();
-    art::FindManyP<simb::MCParticle> findMCParts(mcHandle, evt, "largeant");
+    art::FindManyP<simb::MCParticle> findMCParts(mcHandle, evt, fSimulationProducerLabel);
     std::vector<art::Ptr<simb::MCParticle>> mcParts = findMCParts.at(0);
     for (const art::Ptr<simb::MCParticle> ptr : mcParts) {
       int track_id = ptr->TrackId();

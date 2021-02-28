@@ -153,7 +153,6 @@ namespace nnet {
 
     CLHEP::HepRandomEngine& fEngine; ///< art-managed random-number engine
 
-
   };
 
   //-----------------------------------------------------------------------
@@ -319,11 +318,11 @@ namespace nnet {
               }
             }
           }
-          
+
           writeAndDelete(rawHist);
           writeAndDelete(depHist);
           writeAndDelete(pdgHist);
-          
+
         }
         else if (fDumpToNumpy){
           for (size_t w = w0; w < w1; ++w) {

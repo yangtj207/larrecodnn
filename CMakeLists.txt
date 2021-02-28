@@ -6,9 +6,7 @@
 #  buildtool [-I /install/path] -bt[i] -jN
 # ======================================================================
 
-
-# use cmake 3.14 or later
-cmake_minimum_required (VERSION 3.12...3.14 FATAL_ERROR)
+cmake_minimum_required (VERSION 3.12...3.18 FATAL_ERROR)
 
 project(larrecodnn LANGUAGES CXX)
 
@@ -43,7 +41,6 @@ find_ups_product( nug4 )
 find_ups_product( nurandom )
 find_ups_product( art )
 find_ups_product(art_root_io)
-find_ups_product( cetbuildtools )
 find_ups_product( postgresql )
 find_ups_product( range )
 find_ups_product( eigen )
