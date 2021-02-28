@@ -26,6 +26,10 @@
 #include "fhiclcpp/types/Table.h"
 #include "messagefacility/MessageLogger/MessageLogger.h"
 
+// art extensions
+#include "nurandom/RandomUtils/NuRandomService.h"
+#include "CLHEP/Random/RandFlat.h"
+
 // C++ Includes
 #include <cmath>
 #include <fstream>
@@ -33,6 +37,8 @@
 
 #include "TH2F.h" // ADC and deposit maps
 #include "TH2I.h" // PDG+vertex info map
+
+#include "larrecodnn/ImagePatternAlgs/Modules/c2numpy.h"
 
 namespace {
   template <typename Hist>
@@ -58,9 +64,16 @@ namespace nnet {
       fhicl::Atom<std::string> OutTextFilePath{Name("OutTextFilePath"),
                                                Comment("Text files with all needed data dumped.")};
 
+      fhicl::Atom<std::string> OutNumpyFileName{Name("OutNumpyFileName"),
+                                               Comment("Numpy files with patches.")};
+      
       fhicl::Atom<bool> DumpToRoot{
         Name("DumpToRoot"),
         Comment("Dump to ROOT histogram file (replaces the text files)")};
+
+      fhicl::Atom<bool> DumpToNumpy{
+        Name("DumpToNumpy"),
+        Comment("Dump to Numpy file (replaces the text files)")};
 
       fhicl::Sequence<int> SelectedTPC{
         Name("SelectedTPC"),
@@ -72,10 +85,38 @@ namespace nnet {
 
       fhicl::Atom<bool> Crop{Name("Crop"),
                              Comment("Crop the projection to the event region plus margin")};
+
+      fhicl::Atom<int> Patch_size_w{Name("Patch_size_w"),
+                                    Comment("Patch size in wire dimension")};
+
+      fhicl::Atom<int> Patch_size_d{Name("Patch_size_d"),
+                                    Comment("Patch size in drift dimension")};
+
+      fhicl::Atom<double> Em{Name("Em"),
+                              Comment("Fraction of Em patches to keep")};
+
+      fhicl::Atom<double> Trk{Name("Trk"),
+                              Comment("Fraction of Trk patches to keep")};
+
+      fhicl::Atom<double> Michel{Name("Michel"),
+                                Comment("Fraction of Michel patches to keep")};
+
+      fhicl::Atom<double> None{Name("None"),
+                              Comment("Fraction of None patches to keep")};
+
+      fhicl::Atom<double> StopTrk{Name("StopTrk"),
+                                 Comment("Fraction of stopping Trk patches to keep")};
+
+      fhicl::Atom<double> MulTrk{Name("MulTrk"),
+                                Comment("Fraction of multi-track patches to keep")};
+
     };
     using Parameters = art::EDAnalyzer::Table<Config>;
 
     explicit PointIdTrainingData(Parameters const& config);
+
+    void beginJob() override;
+    void endJob() override;
 
   private:
     void analyze(const art::Event& event) override;
@@ -83,7 +124,9 @@ namespace nnet {
     nnet::TrainingDataAlg fTrainingDataAlg;
 
     std::string fOutTextFilePath;
+    std::string fOutNumpyFileName;
     bool fDumpToRoot;
+    bool fDumpToNumpy;
 
     std::vector<int> fSelectedTPC;
     std::vector<int> fSelectedPlane;
@@ -94,8 +137,23 @@ namespace nnet {
 
     bool fCrop; /// crop data to event (set to false when dumping noise!)
 
+    int fPatch_size_w; /// patch size in wire dimension
+    int fPatch_size_d; /// patch size in drift dimension
+
+    double fEm, fTrk, fMichel, fNone;
+    double fStopTrk, fMulTrk;
+
+    int nEm, nTrk, nMichel, nNone;
+    int nEm_sel, nTrk_sel, nMichel_sel, nNone_sel;
+    int nStopTrk_sel, nMulTrk_sel;
+
     geo::GeometryCore const* fGeometry;
-    
+
+    c2numpy_writer npywriter;
+
+    CLHEP::HepRandomEngine& fEngine; ///< art-managed random-number engine
+
+
   };
 
   //-----------------------------------------------------------------------
@@ -103,10 +161,21 @@ namespace nnet {
     : art::EDAnalyzer(config)
     , fTrainingDataAlg(config().TrainingDataAlg())
     , fOutTextFilePath(config().OutTextFilePath())
+    , fOutNumpyFileName(config().OutNumpyFileName())
     , fDumpToRoot(config().DumpToRoot())
+    , fDumpToNumpy(config().DumpToNumpy())
     , fSelectedTPC(config().SelectedTPC())
     , fSelectedPlane(config().SelectedView())
     , fCrop(config().Crop())
+    , fPatch_size_w(config().Patch_size_w())
+    , fPatch_size_d(config().Patch_size_d())
+    , fEm(config().Em())
+    , fTrk(config().Trk())
+    , fMichel(config().Michel())
+    , fNone(config().None())
+    , fStopTrk(config().StopTrk())
+    , fMulTrk(config().MulTrk())
+    , fEngine(art::ServiceHandle<rndm::NuRandomService>()->createEngine(*this))
   {
     fGeometry = &*(art::ServiceHandle<geo::Geometry const>());
 
@@ -120,6 +189,54 @@ namespace nnet {
       for (size_t p = 0; p < fGeometry->MaxPlanes(); ++p)
         fSelectedPlane.push_back(p);
     }
+
+  }
+
+  //-----------------------------------------------------------------------
+  void PointIdTrainingData::beginJob(){
+
+    c2numpy_init(&npywriter, fOutNumpyFileName, 50000);
+    c2numpy_addcolumn(&npywriter, "run", C2NUMPY_UINT32);
+    c2numpy_addcolumn(&npywriter, "subrun", C2NUMPY_UINT32);
+    c2numpy_addcolumn(&npywriter, "evt", C2NUMPY_UINT32);
+    c2numpy_addcolumn(&npywriter, "tpc", C2NUMPY_UINT8);
+    c2numpy_addcolumn(&npywriter, "plane", C2NUMPY_UINT8);
+    c2numpy_addcolumn(&npywriter, "wire", C2NUMPY_UINT16);
+    c2numpy_addcolumn(&npywriter, "tck", C2NUMPY_UINT16);
+    c2numpy_addcolumn(&npywriter, "y0", C2NUMPY_UINT8);    
+    c2numpy_addcolumn(&npywriter, "y1", C2NUMPY_UINT8);    
+    c2numpy_addcolumn(&npywriter, "y2", C2NUMPY_UINT8);    
+    c2numpy_addcolumn(&npywriter, "y3", C2NUMPY_UINT8);    
+    for (int i = 0; i<fPatch_size_w*fPatch_size_d; ++i){
+      c2numpy_addcolumn(&npywriter, Form("x%d",i), C2NUMPY_FLOAT32);
+    }
+    nEm = 0;
+    nTrk = 0;
+    nMichel = 0;
+    nNone = 0;
+    nEm_sel = 0;
+    nTrk_sel = 0;
+    nMichel_sel = 0;
+    nNone_sel = 0;
+    nStopTrk_sel = 0;
+    nMulTrk_sel = 0;
+  }
+
+  //-----------------------------------------------------------------------
+  void PointIdTrainingData::endJob()
+  {
+    std::cout<<"nEm = "<<nEm<<std::endl;
+    std::cout<<"nTrk = "<<nTrk<<std::endl;
+    std::cout<<"nMichel = "<<nMichel<<std::endl;
+    std::cout<<"nNone = "<<nNone<<std::endl;
+    std::cout<<std::endl;
+    std::cout<<"nEm_sel = "<<nEm_sel<<std::endl;
+    std::cout<<"nTrk_sel = "<<nTrk_sel<<std::endl;
+    std::cout<<"nMichel_sel = "<<nMichel_sel<<std::endl;
+    std::cout<<"nNone_sel = "<<nNone_sel<<std::endl;
+    std::cout<<"nStopTrk_sel = "<<nStopTrk_sel<<std::endl;
+    std::cout<<"nMulTrk_sel = "<<nMulTrk_sel<<std::endl;
+    c2numpy_close(&npywriter);
   }
 
   //-----------------------------------------------------------------------
@@ -141,6 +258,8 @@ namespace nnet {
       art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(event);
     auto const detProp =
       art::ServiceHandle<detinfo::DetectorPropertiesService const>()->DataFor(event, clockData);
+
+    CLHEP::RandFlat flat(fEngine);
 
     for (size_t i = 0; i < fSelectedTPC.size(); ++i)
       for (size_t v = 0; v < fSelectedPlane.size(); ++v) {
@@ -205,6 +324,103 @@ namespace nnet {
           writeAndDelete(depHist);
           writeAndDelete(pdgHist);
           
+        }
+        else if (fDumpToNumpy){
+          for (size_t w = w0; w < w1; ++w) {
+            int w_start = w - fPatch_size_w/2;
+            int w_stop = w_start + fPatch_size_w;
+            if (w_start < int(w0) || w_start > int(w1)) continue;
+            if (w_stop < int(w0) || w_stop > int(w1)) continue;
+            auto const& pdg = fTrainingDataAlg.wirePdg(w);
+            auto const& deposit = fTrainingDataAlg.wireEdep(w);
+            auto const& raw = fTrainingDataAlg.wireData(w);
+            for (size_t d = d0; d < d1; ++d) {
+              int d_start = d - fPatch_size_d/2;
+              int d_stop = d_start + fPatch_size_d;
+              if (d_start < int(d0) || d_start > int(d1)) continue;
+              if (d_stop < int(d0) || d_stop > int(d1)) continue;
+              int y0 = 0, y1 = 0, y2 = 0, y3 = 0;
+              if (deposit[d]<2e-5 || raw[d]<0.05){//empty pixel
+                y3 = 1;
+                ++nNone;
+                if (flat.fire()>fNone) continue;
+                ++nNone_sel;
+              }
+              else if ((pdg[d] & 0x0FFF) == 11){//shower
+                y1 = 1;
+                ++nEm;
+                if ((pdg[d] & 0xF000) == 0x2000){//Michel
+                  y2 = 1;
+                  ++nMichel;
+                  if (flat.fire()>fMichel) continue;
+                  ++nMichel_sel;
+                }
+                else{
+                  if (flat.fire()>fEm) continue;
+                  ++nEm_sel;
+                }
+              }
+              else{//track
+                y0 = 1;
+                ++nTrk;
+                //Check if the track appears to be stopping
+                int nPxlw0 = 0, nPxlw1 = 0, nPxld0 = 0, nPxld1 = 0;
+                //Get the number of track pixels in the patch
+                int nTrkPxls = 0;
+                for (int ww = w_start; ww < w_stop; ++ww){
+                  auto const& pdg1 = fTrainingDataAlg.wirePdg(ww);
+                  auto const& deposit1 = fTrainingDataAlg.wireEdep(ww);
+                  auto const& raw1 = fTrainingDataAlg.wireData(ww);
+                  for (int dd = d_start; dd < d_stop; ++dd){
+                    if (deposit1[dd]<2e-5 || raw1[dd]<0.05) continue; //empty pixel
+                    if ((pdg1[dd] & 0x0FFF) != 11){//track pixel
+                      if (ww >= int(w-3) && ww <= int(w+3) 
+                          && dd >= int(d-3) && dd <= int(d+3)){
+                        ++nTrkPxls;
+                      }
+                      if (ww-w_start < 3) ++nPxlw0;
+                      if (w_stop-ww-1 < 3) ++nPxlw1;
+                      if (dd-d_start < 3) ++nPxld0;
+                      if (d_stop-dd-1 < 3) ++nPxld1;
+                    }
+                  }
+                }
+                //std::cout<<nTrkPxls<<" "<<int(0.9*(fPatch_size_w+fPatch_size_d))<<std::endl;
+                if (nTrkPxls>20){//multi-track candidates
+                  if (flat.fire()>fMulTrk) continue;
+                  ++nMulTrk_sel;
+                }
+                else if (((nPxlw0)&&(!nPxlw1)&&(!nPxld0)&&(!nPxld1))||
+                    ((!nPxlw0)&&(nPxlw1)&&(!nPxld0)&&(!nPxld1))||
+                    ((!nPxlw0)&&(!nPxlw1)&&(nPxld0)&&(!nPxld1))||
+                    ((!nPxlw0)&&(!nPxlw1)&&(!nPxld0)&&(nPxld1))){//stopping track
+                  if (flat.fire()>fStopTrk) continue;
+                  ++nStopTrk_sel;
+                }
+                else {
+                  if (flat.fire()>fTrk) continue;
+                  ++nTrk_sel;
+                }
+              }
+              c2numpy_uint32(&npywriter, event.id().run());
+              c2numpy_uint32(&npywriter, event.id().subRun());
+              c2numpy_uint32(&npywriter, event.id().event());
+              c2numpy_uint8(&npywriter, fSelectedTPC[i]);
+              c2numpy_uint8(&npywriter, fSelectedPlane[v]);
+              c2numpy_uint16(&npywriter, w);
+              c2numpy_uint16(&npywriter, d);
+              c2numpy_uint8(&npywriter, y0);
+              c2numpy_uint8(&npywriter, y1);
+              c2numpy_uint8(&npywriter, y2);
+              c2numpy_uint8(&npywriter, y3);
+              for (int ww = w_start; ww < w_stop; ++ww){
+                auto const& raw1 = fTrainingDataAlg.wireData(ww);
+                for (int dd = d_start; dd < d_stop; ++dd){
+                  c2numpy_float32(&npywriter, raw1[dd]);
+                }
+              }
+            }
+          }
         }
         else {
           std::ostringstream ss1;
