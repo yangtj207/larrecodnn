@@ -34,6 +34,7 @@
 #include <cmath>
 #include <fstream>
 #include <string>
+#include <vector>
 
 #include "TH2F.h" // ADC and deposit maps
 #include "TH2I.h" // PDG+vertex info map
@@ -107,8 +108,8 @@ namespace nnet {
       fhicl::Atom<double> StopTrk{Name("StopTrk"),
                                  Comment("Fraction of stopping Trk patches to keep")};
 
-      fhicl::Atom<double> MulTrk{Name("MulTrk"),
-                                Comment("Fraction of multi-track patches to keep")};
+      fhicl::Atom<double> CleanTrk{Name("CleanTrk"),
+                                Comment("Fraction of clean track patches to keep")};
 
     };
     using Parameters = art::EDAnalyzer::Table<Config>;
@@ -141,17 +142,24 @@ namespace nnet {
     int fPatch_size_d; /// patch size in drift dimension
 
     double fEm, fTrk, fMichel, fNone;
-    double fStopTrk, fMulTrk;
+    double fStopTrk, fCleanTrk;
 
     int nEm, nTrk, nMichel, nNone;
     int nEm_sel, nTrk_sel, nMichel_sel, nNone_sel;
-    int nStopTrk_sel, nMulTrk_sel;
+    int nStopTrk_sel, nCleanTrk_sel;
 
     geo::GeometryCore const* fGeometry;
 
     c2numpy_writer npywriter;
 
     CLHEP::HepRandomEngine& fEngine; ///< art-managed random-number engine
+
+    int WeightedFit(const Int_t  	n,
+                    const Double_t *  	x,
+                    const Double_t *  	y,
+                    const Double_t *  	w,
+                    Double_t *  	parm	 
+                    );
 
   };
 
@@ -173,7 +181,7 @@ namespace nnet {
     , fMichel(config().Michel())
     , fNone(config().None())
     , fStopTrk(config().StopTrk())
-    , fMulTrk(config().MulTrk())
+    , fCleanTrk(config().CleanTrk())
     , fEngine(art::ServiceHandle<rndm::NuRandomService>()->createEngine(*this))
   {
     fGeometry = &*(art::ServiceHandle<geo::Geometry const>());
@@ -218,7 +226,7 @@ namespace nnet {
     nMichel_sel = 0;
     nNone_sel = 0;
     nStopTrk_sel = 0;
-    nMulTrk_sel = 0;
+    nCleanTrk_sel = 0;
   }
 
   //-----------------------------------------------------------------------
@@ -234,7 +242,7 @@ namespace nnet {
     std::cout<<"nMichel_sel = "<<nMichel_sel<<std::endl;
     std::cout<<"nNone_sel = "<<nNone_sel<<std::endl;
     std::cout<<"nStopTrk_sel = "<<nStopTrk_sel<<std::endl;
-    std::cout<<"nMulTrk_sel = "<<nMulTrk_sel<<std::endl;
+    std::cout<<"nCleanTrk_sel = "<<nCleanTrk_sel<<std::endl;
     c2numpy_close(&npywriter);
   }
 
@@ -364,8 +372,9 @@ namespace nnet {
                 ++nTrk;
                 //Check if the track appears to be stopping
                 int nPxlw0 = 0, nPxlw1 = 0, nPxld0 = 0, nPxld1 = 0;
-                //Get the number of track pixels in the patch
-                int nTrkPxls = 0;
+                //Try to fit a track
+                std::vector<double> wfit, dfit, chgfit;
+                double total_trkchg = 0;
                 for (int ww = w_start; ww < w_stop; ++ww){
                   auto const& pdg1 = fTrainingDataAlg.wirePdg(ww);
                   auto const& deposit1 = fTrainingDataAlg.wireEdep(ww);
@@ -373,10 +382,10 @@ namespace nnet {
                   for (int dd = d_start; dd < d_stop; ++dd){
                     if (deposit1[dd]<2e-5 || raw1[dd]<0.05) continue; //empty pixel
                     if ((pdg1[dd] & 0x0FFF) != 11){//track pixel
-                      if (ww >= int(w-3) && ww <= int(w+3) 
-                          && dd >= int(d-3) && dd <= int(d+3)){
-                        ++nTrkPxls;
-                      }
+                      wfit.push_back(ww);
+                      dfit.push_back(dd);
+                      chgfit.push_back(raw1[dd]);
+                      total_trkchg += raw1[dd];
                       if (ww-w_start < 3) ++nPxlw0;
                       if (w_stop-ww-1 < 3) ++nPxlw1;
                       if (dd-d_start < 3) ++nPxld0;
@@ -384,17 +393,35 @@ namespace nnet {
                     }
                   }
                 }
-                //std::cout<<nTrkPxls<<" "<<int(0.9*(fPatch_size_w+fPatch_size_d))<<std::endl;
-                if (nTrkPxls>20){//multi-track candidates
-                  if (flat.fire()>fMulTrk) continue;
-                  ++nMulTrk_sel;
+                //Fit track pixels
+                double fit_trkchg = 0;
+                double parm[2];
+                if (!wfit.empty()){
+                  if (!WeightedFit(wfit.size(), &wfit[0], &dfit[0], &chgfit[0], &parm[0])){
+                    for (size_t j = 0; j<wfit.size(); ++j){
+                      if (std::abs((dfit[j]-(parm[0]+wfit[j]*parm[1]))*cos(atan(parm[1])))<3){
+                        fit_trkchg += chgfit[j];
+                      }
+                    }
+                  }
+                  else if (!WeightedFit(dfit.size(), &dfit[0], &wfit[0], &chgfit[0], &parm[0])){
+                    for (size_t j = 0; j<dfit.size(); ++j){
+                      if (std::abs((wfit[j]-(parm[0]+dfit[j]*parm[1]))*cos(atan(parm[1])))<3){
+                        fit_trkchg += chgfit[j];
+                      }
+                    }
+                  }
                 }
-                else if (((nPxlw0)&&(!nPxlw1)&&(!nPxld0)&&(!nPxld1))||
+                if (((nPxlw0)&&(!nPxlw1)&&(!nPxld0)&&(!nPxld1))||
                     ((!nPxlw0)&&(nPxlw1)&&(!nPxld0)&&(!nPxld1))||
                     ((!nPxlw0)&&(!nPxlw1)&&(nPxld0)&&(!nPxld1))||
                     ((!nPxlw0)&&(!nPxlw1)&&(!nPxld0)&&(nPxld1))){//stopping track
                   if (flat.fire()>fStopTrk) continue;
                   ++nStopTrk_sel;
+                }
+                else if (total_trkchg && fit_trkchg/total_trkchg>0.9){//clean track
+                  if (flat.fire()>fCleanTrk) continue;
+                  ++nCleanTrk_sel;
                 }
                 else {
                   if (flat.fire()>fTrk) continue;
@@ -466,6 +493,52 @@ namespace nnet {
 
   } // PointIdTrainingData::analyze()
 
+  //-----------------------------------------------------------------------
+  int PointIdTrainingData::WeightedFit(const Int_t  	n,
+                                       const Double_t *  	x,
+                                       const Double_t *  	y,
+                                       const Double_t *  	w,
+                                       Double_t *  	parm	 
+                                       ){
+    Double_t sumx=0.;
+    Double_t sumx2=0.;
+    Double_t sumy=0.;
+    Double_t sumy2=0.;
+    Double_t sumxy=0.;
+    Double_t sumw=0.;
+    Double_t eparm[2];
+    
+    parm[0]  = 0.;
+    parm[1]  = 0.;
+    eparm[0] = 0.;
+    eparm[1] = 0.;
+    
+    for (Int_t i=0; i<n; i++) {
+      sumx += x[i]*w[i];
+      sumx2 += x[i]*x[i]*w[i];
+      sumy += y[i]*w[i]; 
+      sumy2 += y[i]*y[i]*w[i];
+      sumxy += x[i]*y[i]*w[i];
+      sumw += w[i];
+    }
+    
+    if (sumx2*sumw-sumx*sumx==0.) return 1;
+    if (sumx2-sumx*sumx/sumw==0.) return 1;
+    
+    parm[0] = (sumy*sumx2-sumx*sumxy)/(sumx2*sumw-sumx*sumx);
+    parm[1] = (sumxy-sumx*sumy/sumw)/(sumx2-sumx*sumx/sumw);
+    
+    eparm[0] = sumx2*(sumx2*sumw-sumx*sumx);
+    eparm[1] = (sumx2-sumx*sumx/sumw);
+    
+    if (eparm[0]<0. || eparm[1]<0.) return 1;
+    
+    eparm[0] = sqrt(eparm[0])/(sumx2*sumw-sumx*sumx);
+    eparm[1] = sqrt(eparm[1])/(sumx2-sumx*sumx/sumw);
+    
+    return 0;
+  }
+  
   DEFINE_ART_MODULE(PointIdTrainingData)
 
 }
